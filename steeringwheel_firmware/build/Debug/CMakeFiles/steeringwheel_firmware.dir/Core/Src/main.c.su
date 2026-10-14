@@ -1,0 +1,8 @@
+D:/home/pavlikravlik/labs/Steering_wheel_STM32/steeringwheel_firmware/Core/Src/main.c:60:17:Read_Potentiometer_Filtered	72	static
+D:/home/pavlikravlik/labs/Steering_wheel_STM32/steeringwheel_firmware/Core/Src/main.c:140:5:main	40	static
+D:/home/pavlikravlik/labs/Steering_wheel_STM32/steeringwheel_firmware/Core/Src/main.c:216:6:SystemClock_Config	128	static
+D:/home/pavlikravlik/labs/Steering_wheel_STM32/steeringwheel_firmware/Core/Src/main.c:267:13:MX_ADC1_Init	48	static
+D:/home/pavlikravlik/labs/Steering_wheel_STM32/steeringwheel_firmware/Core/Src/main.c:333:13:MX_I2C1_Init	8	static
+D:/home/pavlikravlik/labs/Steering_wheel_STM32/steeringwheel_firmware/Core/Src/main.c:381:13:MX_SPI1_Init	8	static
+D:/home/pavlikravlik/labs/Steering_wheel_STM32/steeringwheel_firmware/Core/Src/main.c:421:13:MX_GPIO_Init	48	static
+D:/home/pavlikravlik/labs/Steering_wheel_STM32/steeringwheel_firmware/Core/Src/main.c:478:6:Error_Handler	4	static,ignoring_inline_asm

@@ -1,0 +1,7 @@
+D:/home/pavlikravlik/labs/Steering_wheel_STM32/steeringwheel_firmware/build/Debug/CMakeFiles/steeringwheel_firmware.dir
+D:/home/pavlikravlik/labs/Steering_wheel_STM32/steeringwheel_firmware/build/Debug/CMakeFiles/edit_cache.dir
+D:/home/pavlikravlik/labs/Steering_wheel_STM32/steeringwheel_firmware/build/Debug/CMakeFiles/rebuild_cache.dir
+D:/home/pavlikravlik/labs/Steering_wheel_STM32/steeringwheel_firmware/build/Debug/cmake/stm32cubemx/CMakeFiles/STM32_Drivers.dir
+D:/home/pavlikravlik/labs/Steering_wheel_STM32/steeringwheel_firmware/build/Debug/cmake/stm32cubemx/CMakeFiles/USB_Device_Library.dir
+D:/home/pavlikravlik/labs/Steering_wheel_STM32/steeringwheel_firmware/build/Debug/cmake/stm32cubemx/CMakeFiles/edit_cache.dir
+D:/home/pavlikravlik/labs/Steering_wheel_STM32/steeringwheel_firmware/build/Debug/cmake/stm32cubemx/CMakeFiles/rebuild_cache.dir

@@ -1,0 +1,8 @@
+{
+	"InstallScripts" : 
+	[
+		"D:/home/pavlikravlik/labs/Steering_wheel_STM32/steeringwheel_firmware/build/Debug/cmake_install.cmake",
+		"D:/home/pavlikravlik/labs/Steering_wheel_STM32/steeringwheel_firmware/build/Debug/cmake/stm32cubemx/cmake_install.cmake"
+	],
+	"Parallel" : false
+}
