@@ -1,6 +1,6 @@
 # STM32F3DISCOVERY Steering Wheel Controller
 
-This project implements a custom USB HID steering wheel controller using the **STM32F3DISCOVERY** development board (STM32F303VCT6) and a standard analog potentiometer. The repository contains the complete firmware project generated with STM32CubeMX, as well as a Python visualizer and demonstration game built with Pygame.
+Our project implements a custom USB HID steering wheel controller using the **STM32F3DISCOVERY** development board (STM32F303VCT6) and a standard analog potentiometer. The repository contains the complete firmware project, created with STM32CubeMX, and a Python visualizer and demonstration game.
 
 ---
 
