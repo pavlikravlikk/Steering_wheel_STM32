@@ -91,16 +91,28 @@
 __ALIGN_BEGIN static uint8_t CUSTOM_HID_ReportDesc_FS[USBD_CUSTOM_HID_REPORT_DESC_SIZE] __ALIGN_END =
 {
   /* USER CODE BEGIN 0 */
-  0x05, 0x01,        // USAGE_PAGE (Generic Desktop)
-  0x09, 0x04,        // USAGE (Joystick)
-  0xA1, 0x01,        // COLLECTION (Application)
-    0x09, 0x30,      //   USAGE (X)
-    0x15, 0x00,      //   LOGICAL_MINIMUM (0)
-    0x26, 0xFF, 0x0F, //  LOGICAL_MAXIMUM (4095)
-    0x75, 0x10,      //   REPORT_SIZE (16)
-    0x95, 0x01,      //   REPORT_COUNT (1)
-    0x81, 0x02,      //   INPUT (Data,Var,Abs)
-  0xC0               // END_COLLECTION
+  /* Report (no Report ID, 8 bytes): X, Y, Z as uint16 + 16 button bits. */
+  0x05, 0x01,              // USAGE_PAGE (Generic Desktop)
+  0x09, 0x04,              // USAGE (Joystick)
+  0xA1, 0x01,              // COLLECTION (Application)
+    0x09, 0x30,            //   USAGE (X)  steering
+    0x09, 0x31,            //   USAGE (Y)  throttle (reserved)
+    0x09, 0x32,            //   USAGE (Z)  brake    (reserved)
+    0x15, 0x00,            //   LOGICAL_MINIMUM (0)
+    0x27, 0xFF, 0xFF, 0x00, 0x00, // LOGICAL_MAXIMUM (65535) - 4-byte item,
+                           //   a 2-byte 0xFFFF would be read as -1
+    0x75, 0x10,            //   REPORT_SIZE (16)
+    0x95, 0x03,            //   REPORT_COUNT (3)
+    0x81, 0x02,            //   INPUT (Data,Var,Abs)
+    0x05, 0x09,            //   USAGE_PAGE (Button)
+    0x19, 0x01,            //   USAGE_MINIMUM (Button 1)
+    0x29, 0x10,            //   USAGE_MAXIMUM (Button 16)
+    0x15, 0x00,            //   LOGICAL_MINIMUM (0)
+    0x25, 0x01,            //   LOGICAL_MAXIMUM (1)
+    0x75, 0x01,            //   REPORT_SIZE (1)
+    0x95, 0x10,            //   REPORT_COUNT (16)
+    0x81, 0x02,            //   INPUT (Data,Var,Abs)
+  0xC0                     // END_COLLECTION
   /* USER CODE END 0 */
 };
 

@@ -62,8 +62,12 @@
   */
 
 /* USER CODE BEGIN EXPORTED_TYPES */
+/* Must match the report descriptor in usbd_custom_hid_if.c (8 bytes). */
 typedef struct __attribute__((packed)) {
-  uint16_t x;
+  uint16_t x;        /* steering, 0..65535                                  */
+  uint16_t y;        /* throttle, 0..65535 (reserved, 0 for now)            */
+  uint16_t z;        /* brake,    0..65535 (reserved, 0 for now)            */
+  uint16_t buttons;  /* bit 0 = button 1 ... bit 15 = button 16             */
 } JoystickReport_t;
 /* USER CODE END EXPORTED_TYPES */
 

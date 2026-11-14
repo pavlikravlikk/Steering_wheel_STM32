@@ -45,7 +45,19 @@ target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE
 # Add sources to executable
 target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user sources here
+    Core/Src/encoder.c
+    Core/Src/buttons_mcp23017.c
+    Core/Src/steering_pot.c
+    Core/Src/hid_report.c
 )
+
+# Be strict with our own sources (generated CubeMX code keeps default flags)
+set_source_files_properties(
+    Core/Src/encoder.c
+    Core/Src/buttons_mcp23017.c
+    Core/Src/steering_pot.c
+    Core/Src/hid_report.c
+    PROPERTIES COMPILE_OPTIONS "-Wall;-Wextra")
 
 # Add include paths
 target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
@@ -53,8 +65,21 @@ target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
 )
 
 # Add project symbols (macros)
+# Build options (see Core/Inc/wheel_config.h for all tunables):
+#   -DSTEERING_SOURCE=ENCODER|POT   steering input (default ENCODER)
+#   -DSIMULATE_INPUTS=ON            sine on X + walking buttons, no wiring needed
+set(STEERING_SOURCE "ENCODER" CACHE STRING "Steering input: ENCODER or POT")
+set_property(CACHE STEERING_SOURCE PROPERTY STRINGS ENCODER POT)
+option(SIMULATE_INPUTS "Generate simulated inputs instead of reading hardware" OFF)
+
+set(WHEEL_DEFINES STEERING_SOURCE=STEERING_SOURCE_${STEERING_SOURCE})
+if(SIMULATE_INPUTS)
+    list(APPEND WHEEL_DEFINES SIMULATE_INPUTS=1)
+endif()
+
 target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user defined symbols
+    ${WHEEL_DEFINES}
 )
 
 # Remove wrong libob.a library dependency when using cpp files

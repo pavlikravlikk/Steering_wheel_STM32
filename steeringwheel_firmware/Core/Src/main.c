@@ -12,8 +12,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include "usbd_custom_hid_if.h"
-extern USBD_HandleTypeDef hUsbDeviceFS;
+#include "hid_report.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -39,7 +38,7 @@ I2C_HandleTypeDef hi2c1;
 SPI_HandleTypeDef hspi1;
 
 /* USER CODE BEGIN PV */
-JoystickReport_t joystick_report = {0};
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -54,83 +53,7 @@ static void MX_SPI1_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-#define ADC_OVERSAMPLE_COUNT  16
-#define ADC_DEADBAND_DIFF     4
 
-static uint16_t Read_Potentiometer_Filtered(void)
-{
-  static float   filtered_val = 0.0f;
-  static uint16_t last_output = 0;
-  static uint8_t  initialized = 0;
-
-  uint16_t raw_samples[ADC_OVERSAMPLE_COUNT];
-
-  for (int i = 0; i < ADC_OVERSAMPLE_COUNT; i++)
-  {
-    HAL_ADC_Start(&hadc1);
-    if (HAL_ADC_PollForConversion(&hadc1, 5) == HAL_OK)
-    {
-      raw_samples[i] = (uint16_t)HAL_ADC_GetValue(&hadc1);
-    }
-    else
-    {
-      raw_samples[i] = (i > 0) ? raw_samples[i - 1] : 2048;
-    }
-    HAL_ADC_Stop(&hadc1);
-  }
-
-  for (int i = 1; i < ADC_OVERSAMPLE_COUNT; i++)
-  {
-    uint16_t key = raw_samples[i];
-    int j = i - 1;
-    while (j >= 0 && raw_samples[j] > key)
-    {
-      raw_samples[j + 1] = raw_samples[j];
-      j--;
-    }
-    raw_samples[j + 1] = key;
-  }
-
-  uint32_t sum = 0;
-  for (int i = 2; i < ADC_OVERSAMPLE_COUNT - 2; i++)
-  {
-    sum += raw_samples[i];
-  }
-  uint16_t trimmed_mean = (uint16_t)(sum / (ADC_OVERSAMPLE_COUNT - 4));
-
-  if (!initialized)
-  {
-    filtered_val = (float)trimmed_mean;
-    last_output = trimmed_mean;
-    initialized = 1;
-    return last_output;
-  }
-
-  filtered_val += 0.25f * ((float)trimmed_mean - filtered_val);
-  uint16_t smoothed = (uint16_t)(filtered_val + 0.5f);
-
-  int32_t diff = (int32_t)smoothed - (int32_t)last_output;
-  if (diff < 0)
-  {
-    diff = -diff;
-  }
-
-  if (diff >= ADC_DEADBAND_DIFF)
-  {
-    last_output = smoothed;
-  }
-
-  if (last_output <= 8)
-  {
-    return 0;
-  }
-  if (last_output >= 4087)
-  {
-    return 4095;
-  }
-
-  return last_output;
-}
 /* USER CODE END 0 */
 
 /**
@@ -175,33 +98,14 @@ int main(void)
   MX_SPI1_Init();
   MX_USB_DEVICE_Init();
   /* USER CODE BEGIN 2 */
-  HAL_ADCEx_Calibration_Start(&hadc1, ADC_SINGLE_ENDED);
+  hid_report_init();   /* encoder / pot / MCP23017 + 1 kHz TIM6 tick */
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-  uint32_t blink_timer = 0;
-
   while (1)
   {
-    if (HAL_GetTick() - blink_timer >= 500)
-    {
-      blink_timer = HAL_GetTick();
-      HAL_GPIO_TogglePin(LD3_GPIO_Port, LD3_Pin);
-    }
-
-    if (hUsbDeviceFS.dev_state == USBD_STATE_CONFIGURED)
-    {
-      HAL_GPIO_WritePin(LD7_GPIO_Port, LD7_Pin, GPIO_PIN_SET);
-      joystick_report.x = Read_Potentiometer_Filtered();
-      USBD_CUSTOM_HID_SendReport(&hUsbDeviceFS, (uint8_t *)&joystick_report, sizeof(joystick_report));
-    }
-    else
-    {
-      HAL_GPIO_WritePin(LD7_GPIO_Port, LD7_Pin, GPIO_PIN_RESET);
-    }
-
-    HAL_Delay(10);
+    hid_report_poll();   /* once per 1 ms tick: inputs -> USB HID report, never blocks */
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */

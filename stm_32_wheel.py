@@ -1,5 +1,8 @@
+import glob
 import math
+import os
 import random
+import struct
 import sys
 
 import pygame
@@ -9,12 +12,16 @@ try:
 except ImportError:
     hid = None
 
-# ====================== НАЛАШТУВАННЯ ======================
-ADC_MAX = 4095
-ADC_CENTER = ADC_MAX / 2     # значення АЦП у прямому положенні керма
-MAX_ANGLE = 180.0            # кут повороту в кожен бік
-INVERT = False               # True, якщо кермо крутиться в протилежний бік
-RESPONSE = 14.0              # швидкість згладжування (більше = різкіше)
+# ====================== SETTINGS ======================
+VID, PID = 0x0483, 0x5752    # STM32 Steering Wheel Controller
+REPORT_FMT = "<HHHH"         # X, Y, Z (uint16) + 16 button bits, no Report ID
+REPORT_LEN = struct.calcsize(REPORT_FMT)   # 8 bytes
+AXIS_MAX = 65535
+AXIS_CENTER = AXIS_MAX / 2   # raw X value with the wheel straight
+NUM_BUTTONS = 10             # buttons 1..10 are wired (bits 0..9)
+MAX_ANGLE = 270.0            # display angle per side (540 deg lock-to-lock)
+INVERT = False               # True if the wheel turns the wrong way
+RESPONSE = 14.0              # smoothing speed (higher = snappier)
 
 W, H = 1000, 680
 WHEEL_R = 190
@@ -22,25 +29,65 @@ WHEEL_C = (320, 340)
 PANEL = pygame.Rect(650, 40, 310, 600)
 FPS = 60
 
+# Demo mode: keys 1..9 and 0 emulate buttons 1..10.
+DEMO_BUTTON_KEYS = [pygame.K_1, pygame.K_2, pygame.K_3, pygame.K_4, pygame.K_5,
+                    pygame.K_6, pygame.K_7, pygame.K_8, pygame.K_9, pygame.K_0]
 
-# ====================== ПІДКЛЮЧЕННЯ HID ======================
+
+# ====================== HID CONNECTION ======================
+class HidrawDevice:
+    """Read directly from /dev/hidrawN (Linux), without the hidapi library."""
+
+    def __init__(self, path):
+        self.fd = os.open(path, os.O_RDONLY | os.O_NONBLOCK)
+
+    def read(self, size):
+        try:
+            return list(os.read(self.fd, size))
+        except BlockingIOError:
+            return []
+        except OSError as e:
+            raise OSError(e)
+
+
+def open_hidraw_linux():
+    """Find the STM32 (VID 0483, PID 5752) among /dev/hidraw*."""
+    for uevent in glob.glob("/sys/class/hidraw/hidraw*/device/uevent"):
+        try:
+            text = open(uevent).read().upper()
+        except OSError:
+            continue
+        if "0483" in text and "5752" in text:
+            node = uevent.split("/")[4]
+            return HidrawDevice("/dev/" + node), "STM32 Steering Wheel (" + node + ")"
+    return None, None
+
+
 def open_gamepad():
+    if sys.platform.startswith("linux"):
+        try:
+            dev, name = open_hidraw_linux()
+            if dev:
+                return dev, name
+        except OSError as e:
+            print("[HIDRAW]", e, "- a udev rule or sudo is required (see README)")
     if hid is None:
-        return None, "Демо-режим (немає hid)"
+        return None, "Demo mode (hid not installed)"
     try:
         for info in hid.enumerate():
             name = info.get("product_string", "") or ""
-            if "STEERING WHEEL" in name.upper():
+            if (info.get("vendor_id") == VID and info.get("product_id") == PID) \
+                    or "STEERING WHEEL" in name.upper():
                 dev = hid.device()
                 dev.open_path(info["path"])
                 dev.set_nonblocking(True)
                 return dev, name
     except Exception as e:
         print("[HID]", e)
-    return None, "Демо-режим (стрілки / A D)"
+    return None, "Demo mode (arrows / A D, keys 1-0 = buttons)"
 
 
-# ====================== ГРАФІКА ======================
+# ====================== GRAPHICS ======================
 def lerp(a, b, t):
     return a + (b - a) * t
 
@@ -54,7 +101,7 @@ def make_background():
     top, bottom = (10, 12, 24), (26, 18, 48)
     for y in range(H):
         pygame.draw.line(bg, lerp_color(top, bottom, y / H), (0, y), (W, y))
-    # дрібні «зорі»
+    # tiny "stars"
     rnd = random.Random(7)
     for _ in range(90):
         x, y = rnd.randrange(W), rnd.randrange(H)
@@ -72,15 +119,15 @@ def make_glow(radius, color):
 
 
 def make_wheel(R):
-    ss = 3                                   # суперсемплінг для плавних країв
+    ss = 3                                   # supersampling for smooth edges
     S = R * 2 * ss
     surf = pygame.Surface((S, S), pygame.SRCALPHA)
     c = S // 2
     r = R * ss
-    t = 30 * ss                              # товщина обода
-    inner = r - t // 2 + 2 * ss              # куди впираються спиці
+    t = 30 * ss                              # rim thickness
+    inner = r - t // 2 + 2 * ss              # where the spokes end
 
-    # --- спиці (тінь + метал) ---
+    # --- spokes (shadow + metal) ---
     spokes = [
         ((c, c + 10 * ss), (c, c + inner)),
         ((c - 20 * ss, c - 6 * ss), (c - inner * 0.97, c - 36 * ss)),
@@ -92,16 +139,16 @@ def make_wheel(R):
         pygame.draw.line(surf, (150, 153, 165), a, b, 24 * ss)
         pygame.draw.line(surf, (215, 218, 228), a, b, 8 * ss)
 
-    # --- обід ---
-    pygame.draw.circle(surf, (12, 14, 22), (c, c), r, t)                    # контур
-    pygame.draw.circle(surf, (28, 78, 205), (c, c), r - 3 * ss, t - 6 * ss)  # шкіра
+    # --- rim ---
+    pygame.draw.circle(surf, (12, 14, 22), (c, c), r, t)                    # outline
+    pygame.draw.circle(surf, (28, 78, 205), (c, c), r - 3 * ss, t - 6 * ss)  # leather
     ring_rect = pygame.Rect(0, 0, 2 * (r - t // 2), 2 * (r - t // 2))
     ring_rect.center = (c, c)
-    # блік зверху-ліворуч та тінь знизу-праворуч
+    # top-left highlight and bottom-right shadow
     pygame.draw.arc(surf, (110, 165, 255), ring_rect, math.radians(95), math.radians(175), 7 * ss)
     pygame.draw.arc(surf, (14, 40, 120), ring_rect, math.radians(280), math.radians(355), 8 * ss)
 
-    # --- строчка ---
+    # --- stitching ---
     rs = r - t // 2
     for i in range(120):
         ang = i * math.tau / 120
@@ -109,12 +156,12 @@ def make_wheel(R):
         y = c + math.sin(ang) * rs
         pygame.draw.circle(surf, (225, 232, 250), (x, y), max(1, int(1.6 * ss)))
 
-    # --- маркер «12 годин» ---
+    # --- 12 o'clock marker ---
     mk = pygame.Rect(0, 0, 9 * ss, t - 6 * ss)
     mk.center = (c, c - rs)
     pygame.draw.rect(surf, (255, 50, 50), mk, border_radius=3 * ss)
 
-    # --- центральний хаб з градієнтом ---
+    # --- centre hub with gradient ---
     hub = 62 * ss
     for i in range(hub, 0, -1):
         col = lerp_color((235, 238, 248), (85, 88, 102), i / hub)
@@ -130,7 +177,7 @@ def make_wheel(R):
 
 
 def draw_round_bar(screen, rect, value, color_pos, color_neg, bg=(30, 32, 48)):
-    """Центрована смуга: value від -1 до +1."""
+    """Centred bar: value from -1 to +1."""
     pygame.draw.rect(screen, bg, rect, border_radius=rect.height // 2)
     cx = rect.centerx
     half = rect.width // 2
@@ -148,7 +195,7 @@ def draw_text(screen, font, text, pos, color=(235, 238, 250), anchor="topleft"):
     screen.blit(img, r)
 
 
-# ====================== ГРА ======================
+# ====================== GAME ======================
 class Game:
     def __init__(self):
         self.reset()
@@ -167,14 +214,14 @@ class Game:
     @staticmethod
     def make_car():
         s = pygame.Surface((44, 82), pygame.SRCALPHA)
-        pygame.draw.rect(s, (0, 0, 0, 90), (3, 6, 40, 78), border_radius=12)           # тінь
+        pygame.draw.rect(s, (0, 0, 0, 90), (3, 6, 40, 78), border_radius=12)           # shadow
         for x, y in ((0, 12), (36, 12), (0, 54), (36, 54)):
-            pygame.draw.rect(s, (15, 15, 20), (x, y, 8, 18), border_radius=3)           # колеса
-        pygame.draw.rect(s, (225, 40, 55), (5, 2, 34, 76), border_radius=14)            # кузов
-        pygame.draw.rect(s, (255, 110, 120), (9, 4, 12, 70), border_radius=8)           # блік
-        pygame.draw.rect(s, (25, 30, 55), (10, 22, 24, 16), border_radius=5)            # лобове
-        pygame.draw.rect(s, (25, 30, 55), (11, 52, 22, 10), border_radius=5)            # заднє
-        pygame.draw.circle(s, (255, 245, 180), (12, 6), 3)                              # фари
+            pygame.draw.rect(s, (15, 15, 20), (x, y, 8, 18), border_radius=3)           # wheels
+        pygame.draw.rect(s, (225, 40, 55), (5, 2, 34, 76), border_radius=14)            # body
+        pygame.draw.rect(s, (255, 110, 120), (9, 4, 12, 70), border_radius=8)           # highlight
+        pygame.draw.rect(s, (25, 30, 55), (10, 22, 24, 16), border_radius=5)            # windscreen
+        pygame.draw.rect(s, (25, 30, 55), (11, 52, 22, 10), border_radius=5)            # rear window
+        pygame.draw.circle(s, (255, 245, 180), (12, 6), 3)                              # headlights
         pygame.draw.circle(s, (255, 245, 180), (32, 6), 3)
         return s
 
@@ -220,19 +267,19 @@ class Game:
         return pygame.Rect(int(x - 14), int(o["y"] - 14), 28, 28)
 
     def draw(self, screen, steer, fonts):
-        # рамка панелі
+        # panel frame
         pygame.draw.rect(screen, (14, 16, 28), PANEL.inflate(10, 10), border_radius=22)
         old_clip = screen.get_clip()
         screen.set_clip(PANEL)
-        pygame.draw.rect(screen, (22, 128, 70), PANEL)                          # трава
+        pygame.draw.rect(screen, (22, 128, 70), PANEL)                          # grass
         road = self.road_rect()
-        pygame.draw.rect(screen, (48, 50, 60), road)                            # асфальт
+        pygame.draw.rect(screen, (48, 50, 60), road)                            # asphalt
         pygame.draw.rect(screen, (240, 240, 245), (road.x, PANEL.y, 5, PANEL.height))
         pygame.draw.rect(screen, (240, 240, 245), (road.right - 5, PANEL.y, 5, PANEL.height))
-        for y in range(PANEL.y - 60, PANEL.bottom + 60, 60):                    # розмітка
+        for y in range(PANEL.y - 60, PANEL.bottom + 60, 60):                    # lane markings
             pygame.draw.rect(screen, (250, 210, 70), (road.centerx - 3, y + self.offset, 6, 32), border_radius=3)
 
-        for o in self.obstacles:                                               # конуси
+        for o in self.obstacles:                                               # cones
             r = self.obstacle_rect(o)
             pygame.draw.ellipse(screen, (0, 0, 0), r.inflate(6, -10).move(2, 10))
             pygame.draw.polygon(screen, (255, 120, 20), [(r.centerx, r.y), (r.right - 2, r.bottom - 4), (r.x + 2, r.bottom - 4)])
@@ -240,18 +287,18 @@ class Game:
                                                           (r.centerx + 9, r.y + 18), (r.centerx - 9, r.y + 18)])
             pygame.draw.rect(screen, (30, 30, 35), (r.x, r.bottom - 5, r.width, 5), border_radius=2)
 
-        cr = self.car_rect(steer)                                              # машинка
+        cr = self.car_rect(steer)                                              # car
         tilted = pygame.transform.rotozoom(self.car, -steer * 14, 1.0)
         screen.blit(tilted, tilted.get_rect(center=cr.center))
 
-        if self.flash > 0:                                                     # червоний спалах при ударі
+        if self.flash > 0:                                                     # red flash on impact
             fl = pygame.Surface(PANEL.size, pygame.SRCALPHA)
             fl.fill((255, 40, 40, int(150 * self.flash / 0.35)))
             screen.blit(fl, PANEL.topleft)
         screen.set_clip(old_clip)
 
         # HUD
-        draw_text(screen, fonts["small"], f"Очки: {self.score}", (PANEL.x + 14, PANEL.y + 10), (255, 255, 255))
+        draw_text(screen, fonts["small"], f"Score: {self.score}", (PANEL.x + 14, PANEL.y + 10), (255, 255, 255))
         for i in range(3):
             col = (255, 70, 90) if i < self.lives else (70, 70, 85)
             pygame.draw.circle(screen, col, (PANEL.right - 24 - i * 24, PANEL.y + 22), 8)
@@ -260,12 +307,12 @@ class Game:
             ov = pygame.Surface(PANEL.size, pygame.SRCALPHA)
             ov.fill((0, 0, 0, 160))
             screen.blit(ov, PANEL.topleft)
-            draw_text(screen, fonts["big"], "ГРА ЗАВЕРШЕНА", PANEL.center, (255, 255, 255), "center")
-            draw_text(screen, fonts["small"], f"Очки: {self.score}", (PANEL.centerx, PANEL.centery + 40), (255, 220, 120), "center")
-            draw_text(screen, fonts["small"], "R / Пробіл — знову", (PANEL.centerx, PANEL.centery + 72), (190, 195, 215), "center")
+            draw_text(screen, fonts["big"], "GAME OVER", PANEL.center, (255, 255, 255), "center")
+            draw_text(screen, fonts["small"], f"Score: {self.score}", (PANEL.centerx, PANEL.centery + 40), (255, 220, 120), "center")
+            draw_text(screen, fonts["small"], "R / Space - restart", (PANEL.centerx, PANEL.centery + 72), (190, 195, 215), "center")
 
 
-# ====================== ГОЛОВНИЙ ЦИКЛ ======================
+# ====================== MAIN LOOP ======================
 def main():
     gamepad, device_name = open_gamepad()
     demo = gamepad is None
@@ -280,6 +327,7 @@ def main():
         "big": pygame.font.SysFont("segoeui,arial,calibri", 30, bold=True),
         "small": pygame.font.SysFont("segoeui,arial,calibri", 22, bold=True),
         "tiny": pygame.font.SysFont("segoeui,arial,calibri", 17),
+        "micro": pygame.font.SysFont("segoeui,arial,calibri", 13, bold=True),
     }
 
     background = make_background()
@@ -289,7 +337,9 @@ def main():
     pygame.draw.ellipse(shadow, (0, 0, 0, 90), shadow.get_rect().inflate(-40, -40))
 
     game = Game()
-    adc_raw = int(ADC_CENTER)
+    x_raw = int(AXIS_CENTER)
+    y_raw = z_raw = 0
+    buttons = 0
     axis_val = 0.0
     smoothed = 0.0
     peak = 0.0
@@ -307,12 +357,16 @@ def main():
                     elif event.key in (pygame.K_r, pygame.K_SPACE):
                         game.reset()
 
-            # --- читання керма ---
+            # --- read the wheel ---
             if demo:
                 keys = pygame.key.get_pressed()
                 target = (keys[pygame.K_RIGHT] or keys[pygame.K_d]) - (keys[pygame.K_LEFT] or keys[pygame.K_a])
                 axis_val += max(-3 * dt, min(3 * dt, target - axis_val))
-                adc_raw = int(ADC_CENTER + axis_val * ADC_CENTER)
+                x_raw = int(AXIS_CENTER + axis_val * AXIS_CENTER)
+                buttons = 0
+                for i, key in enumerate(DEMO_BUTTON_KEYS):
+                    if keys[key]:
+                        buttons |= 1 << i
             else:
                 latest = None
                 try:
@@ -322,10 +376,10 @@ def main():
                             break
                         latest = rep
                 except OSError:
-                    demo, device_name = True, "Пристрій відключено"
-                if latest and len(latest) >= 2:
-                    adc_raw = max(0, min(ADC_MAX, latest[0] | (latest[1] << 8)))
-                    axis_val = max(-1.0, min(1.0, (adc_raw - ADC_CENTER) / ADC_CENTER))
+                    demo, device_name = True, "Device disconnected"
+                if latest and len(latest) >= REPORT_LEN:
+                    x_raw, y_raw, z_raw, buttons = struct.unpack_from(REPORT_FMT, bytes(latest))
+                    axis_val = max(-1.0, min(1.0, (x_raw - AXIS_CENTER) / AXIS_CENTER))
 
             if INVERT:
                 axis_val_used = -axis_val
@@ -337,7 +391,7 @@ def main():
 
             game.update(dt, smoothed)
 
-            # --- малювання ---
+            # --- drawing ---
             screen.blit(background, (0, 0))
 
             intensity = min(1.0, abs(smoothed))
@@ -349,25 +403,34 @@ def main():
             rotated = pygame.transform.rotozoom(wheel_img, -angle, 1.0)
             screen.blit(rotated, rotated.get_rect(center=WHEEL_C))
 
-            # шапка
+            # header
             draw_text(screen, fonts["title"], "Steering Wheel", (30, 24))
             dot = (80, 230, 130) if not demo else (255, 190, 60)
             pygame.draw.circle(screen, dot, (36, 74), 6)
             draw_text(screen, fonts["tiny"], device_name, (50, 64), (170, 178, 205))
 
-            # індикатори під кермом
+            # indicators below the wheel
             bar = pygame.Rect(WHEEL_C[0] - 200, 600, 400, 14)
             draw_round_bar(screen, bar, smoothed, (80, 220, 255), (255, 170, 80))
             draw_text(screen, fonts["small"], f"{angle:+.1f}°", (WHEEL_C[0], 575), (200, 255, 120), "center")
-            draw_text(screen, fonts["tiny"], f"АЦП {adc_raw:04d}", (bar.x, 628), (150, 160, 190))
-            draw_text(screen, fonts["tiny"], f"Вісь {smoothed:+.2f}", (bar.right, 628), (150, 160, 190), "topright")
+            draw_text(screen, fonts["tiny"], f"X {x_raw:05d}  Y {y_raw:05d}  Z {z_raw:05d}", (bar.x, 628), (150, 160, 190))
+            draw_text(screen, fonts["tiny"], f"Axis {smoothed:+.2f}", (bar.right, 628), (150, 160, 190), "topright")
 
-            # маркер піку на смузі
+            # buttons 1..10 (lit = pressed)
+            for i in range(NUM_BUTTONS):
+                bx = WHEEL_C[0] + int((i - (NUM_BUTTONS - 1) / 2) * 32)
+                on = bool(buttons & (1 << i))
+                pygame.draw.circle(screen, (255, 210, 70) if on else (38, 42, 62), (bx, 662), 13)
+                pygame.draw.circle(screen, (230, 235, 250) if on else (80, 88, 120), (bx, 662), 13, 2)
+                draw_text(screen, fonts["micro"], str(i + 1), (bx, 662),
+                          (20, 22, 32) if on else (150, 160, 190), "center")
+
+            # peak marker on the bar
             px = bar.centerx + int(math.copysign(peak, smoothed) * bar.width / 2)
             pygame.draw.circle(screen, (255, 255, 255), (px, bar.centery), 4)
 
             game.draw(screen, smoothed, fonts)
-            draw_text(screen, fonts["tiny"], "ESC — вихід  |  R — рестарт", (PANEL.centerx, H - 22), (120, 128, 160), "center")
+            draw_text(screen, fonts["tiny"], "ESC - quit  |  R - restart", (PANEL.centerx, H - 22), (120, 128, 160), "center")
 
             pygame.display.flip()
     finally:
