@@ -54,7 +54,7 @@ static void tick_timer_start(void)
   TIM6->CR1  = 0U;
   TIM6->PSC  = (uint16_t)((tim_clk / 1000000U) - 1U);   /* 1 MHz counter    */
   TIM6->ARR  = 999U;                                    /* 1000 us = 1 kHz  */
-  TIM6->EGF  = TIM_EGR_UG;                              /* load PSC/ARR     */
+  TIM6->EGR  = TIM_EGR_UG;                              /* load PSC/ARR     */
   TIM6->SR   = 0U;
   TIM6->DIER = TIM_DIER_UIE;
 
