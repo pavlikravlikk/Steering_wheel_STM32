@@ -5,9 +5,11 @@
 #include "hid_report.h"
 
 #include "buttons_mcp23017.h"
+#include "debounce.h"
 #include "encoder.h"
 #include "hid_pack.h"
 #include "main.h"
+#include "odrive_link.h"
 #include "steering_pot.h"
 #include "usbd_customhid.h"
 #include "usbd_custom_hid_if.h"
@@ -31,6 +33,13 @@ static uint8_t          s_tx[HID_REPORT_SIZE]; /* packed bytes; static: valid fo
 static volatile uint8_t s_tick_pending;
 static uint32_t         s_ms;
 static uint32_t         s_heartbeat_ms;
+static debounce_t       s_b1_debounce;     /* blue user button B1 (PA0)     */
+static hold_detector_t  s_b1_hold;         /* hold -> set steering centre   */
+
+#if (STEERING_SOURCE != STEERING_SOURCE_ODRIVE) && (STEERING_SOURCE != STEERING_SOURCE_ENCODER) \
+    && (STEERING_SOURCE != STEERING_SOURCE_POT)
+#error "STEERING_SOURCE must be STEERING_SOURCE_ODRIVE, _ENCODER or _POT"
+#endif
 
 /* ---------------------------------------------------------------------- */
 /* 1 kHz tick: TIM6 update interrupt                                      */
@@ -100,16 +109,76 @@ static uint16_t simulated_buttons(uint32_t ms)
 #endif /* SIMULATE_INPUTS */
 
 /* ---------------------------------------------------------------------- */
+/* Steering source                                                        */
+/* ---------------------------------------------------------------------- */
+#if !SIMULATE_INPUTS
+static void steering_init(void)
+{
+#if (STEERING_SOURCE == STEERING_SOURCE_ODRIVE)
+  odrive_link_init();          /* USART1 PA9/PA10, read-only "f 0" polling */
+  (void)hadc1;
+#elif (STEERING_SOURCE == STEERING_SOURCE_ENCODER)
+  encoder_init();
+  (void)hadc1;
+#else
+  steering_pot_init(&hadc1);
+#endif
+}
+
+/** Called every 1 ms tick. ODrive RX/TX is serviced from the main loop
+ *  (main.c); here only the latest mapped value is picked up. */
+static uint16_t steering_axis16(void)
+{
+#if (STEERING_SOURCE == STEERING_SOURCE_ODRIVE)
+  return odrive_link_axis16();
+#elif (STEERING_SOURCE == STEERING_SOURCE_ENCODER)
+  encoder_update();
+  return encoder_get_axis16();
+#else
+  steering_pot_update();
+  return steering_pot_get_axis16();
+#endif
+}
+#endif /* !SIMULATE_INPUTS */
+
+static bool steering_set_centre(void)
+{
+#if (STEERING_SOURCE == STEERING_SOURCE_ODRIVE)
+  return odrive_link_set_centre(HAL_GetTick());
+#elif (STEERING_SOURCE == STEERING_SOURCE_ENCODER)
+  encoder_set_center();
+  return true;
+#else
+  return false;                /* a potentiometer has a fixed centre */
+#endif
+}
+
+/** Blue user button B1 (PA0, active high, external pull-down on the
+ *  Discovery board): debounced, held SET_CENTRE_HOLD_MS -> set centre. */
+static void centre_button_task(uint32_t now_ms)
+{
+  const uint16_t raw = (HAL_GPIO_ReadPin(B1_GPIO_Port, B1_Pin) == GPIO_PIN_SET) ? 1U : 0U;
+  const bool pressed = (debounce_update(&s_b1_debounce, raw, now_ms) & 1U) != 0U;
+
+  if (hold_update(&s_b1_hold, pressed, now_ms))
+  {
+    if (steering_set_centre())
+    {
+      HAL_GPIO_TogglePin(LD9_GPIO_Port, LD9_Pin);   /* blue: centre accepted */
+    }
+  }
+}
+
+/* ---------------------------------------------------------------------- */
 /* Public API                                                             */
 /* ---------------------------------------------------------------------- */
 void hid_report_init(void)
 {
+  debounce_init(&s_b1_debounce, 1U, BUTTON_DEBOUNCE_MS, 0U);
+  hold_init(&s_b1_hold, SET_CENTRE_HOLD_MS);
+
 #if !SIMULATE_INPUTS
-#if (STEERING_SOURCE == STEERING_SOURCE_ENCODER)
-  encoder_init();
-#else
-  steering_pot_init(&hadc1);
-#endif
+  steering_init();
   buttons_init(&hi2c1);
 #else
   (void)hadc1;
@@ -119,7 +188,7 @@ void hid_report_init(void)
   tick_timer_start();
 }
 
-static void heartbeat_leds(uint32_t now_ms)
+static void status_leds(uint32_t now_ms)
 {
   if ((now_ms - s_heartbeat_ms) >= 500U)
   {
@@ -129,6 +198,11 @@ static void heartbeat_leds(uint32_t now_ms)
   HAL_GPIO_WritePin(LD7_GPIO_Port, LD7_Pin,
                     (hUsbDeviceFS.dev_state == USBD_STATE_CONFIGURED)
                         ? GPIO_PIN_SET : GPIO_PIN_RESET);
+#if (STEERING_SOURCE == STEERING_SOURCE_ODRIVE) && !SIMULATE_INPUTS
+  /* Orange LD5 = ODrive position missing or stale (X is being held). */
+  HAL_GPIO_WritePin(LD5_GPIO_Port, LD5_Pin,
+                    odrive_link_ok(HAL_GetTick()) ? GPIO_PIN_RESET : GPIO_PIN_SET);
+#endif
 }
 
 static uint8_t usb_ready_for_report(void)
@@ -155,20 +229,15 @@ void hid_report_poll(void)
   s_report.x       = simulated_x(s_ms);
   s_report.buttons = simulated_buttons(s_ms);
 #else
-#if (STEERING_SOURCE == STEERING_SOURCE_ENCODER)
-  encoder_update();
-  s_report.x = encoder_get_axis16();
-#else
-  steering_pot_update();
-  s_report.x = steering_pot_get_axis16();
-#endif
+  s_report.x = steering_axis16();
   buttons_update(s_ms);
   s_report.buttons = buttons_get();
 #endif
   s_report.y = HID_AXIS_Y_NEUTRAL;   /* throttle: reserved for the future pedals */
   s_report.z = HID_AXIS_Z_NEUTRAL;   /* brake:    reserved for the future pedals */
 
-  heartbeat_leds(s_ms);
+  centre_button_task(s_ms);
+  status_leds(s_ms);
 
   /* 2. Send only when the previous IN transfer has completed. */
   if (usb_ready_for_report() != 0U)

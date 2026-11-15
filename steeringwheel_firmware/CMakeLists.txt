@@ -50,6 +50,11 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     Core/Src/steering_pot.c
     Core/Src/hid_report.c
     Core/Src/hid_pack.c
+    Core/Src/odrive_ascii.c
+    Core/Src/odrive_link.c
+    Core/Src/odrive_uart.c
+    Core/Src/steering_map.c
+    Core/Src/debounce.c
 )
 
 # Be strict with our own sources (generated CubeMX code keeps default flags)
@@ -59,6 +64,11 @@ set_source_files_properties(
     Core/Src/steering_pot.c
     Core/Src/hid_report.c
     Core/Src/hid_pack.c
+    Core/Src/odrive_ascii.c
+    Core/Src/odrive_link.c
+    Core/Src/odrive_uart.c
+    Core/Src/steering_map.c
+    Core/Src/debounce.c
     PROPERTIES COMPILE_OPTIONS "-Wall;-Wextra")
 
 # Add include paths
@@ -68,10 +78,13 @@ target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
 
 # Add project symbols (macros)
 # Build options (see Core/Inc/wheel_config.h for all tunables):
-#   -DSTEERING_SOURCE=ENCODER|POT   steering input (default ENCODER)
+#   -DSTEERING_SOURCE=ODRIVE|ENCODER|POT
+#                                   steering input (default ODRIVE: position
+#                                   read over USART1 from the ODrive;
+#                                   ENCODER = encoder on STM32 TIM3, POT = PA1)
 #   -DSIMULATE_INPUTS=ON            sine on X + walking buttons, no wiring needed
-set(STEERING_SOURCE "ENCODER" CACHE STRING "Steering input: ENCODER or POT")
-set_property(CACHE STEERING_SOURCE PROPERTY STRINGS ENCODER POT)
+set(STEERING_SOURCE "ODRIVE" CACHE STRING "Steering input: ODRIVE, ENCODER or POT")
+set_property(CACHE STEERING_SOURCE PROPERTY STRINGS ODRIVE ENCODER POT)
 option(SIMULATE_INPUTS "Generate simulated inputs instead of reading hardware" OFF)
 
 set(WHEEL_DEFINES STEERING_SOURCE=STEERING_SOURCE_${STEERING_SOURCE})
