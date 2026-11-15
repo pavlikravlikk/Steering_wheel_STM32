@@ -6,10 +6,15 @@ firmware and a Python visualizer / demo game.
 
 | Item | Source | Status |
 | :--- | :--- | :--- |
-| X – steering | LPD3806-600BM quadrature encoder on TIM3 (default) or potentiometer on PA1 | implemented |
-| Y – throttle | pedals (future) | declared, always `0` |
-| Z – brake | pedals (future) | declared, always `0` |
+| X – steering | position read **from the ODrive over USART1** (PA9/PA10, read-only `f 0` at 100 Hz; encoder LPD3806 is wired to the ODrive) – default. Fallbacks: encoder on STM32 TIM3, potentiometer on PA1 | implemented |
+| Y – throttle | pedals (future) | declared, `HID_AXIS_Y_NEUTRAL` (0) |
+| Z – brake | pedals (future) | declared, `HID_AXIS_Z_NEUTRAL` (0) |
 | Buttons 1–10 | MCP23017 I/O expander on I2C1 (0x20) | implemented (bits 0..9; bits 10..15 reserved, `0`) |
+
+> **Status / safety (2026-11-15):** the firmware never commands the motor. The ODrive driver
+> can only transmit `f <axis>` / `r <path>` (enforced by an allowlist + tests). See
+> `docs/DECISIONS.md`, `docs/BENCH_CHECKLIST.md`, `docs/IOC_TODO.md`, `docs/AUDIT.md`,
+> `docs/TEAMMATE_REVIEW.md`. Host unit tests: `make -C tests` (`tests/README.md`).
 
 ---
 
@@ -122,7 +127,8 @@ moving average (α = 1/8 per ms), a ~4-count deadband and clamping at both ends.
 
 ### Pins deliberately left untouched
 PA0 (user button), PA5–PA7 (gyro SPI), PE0–PE5 (MEMS), PE8–PE15 (LEDs), PA11/PA12 (USB),
-PA13/PA14 (SWD). Newly used: PC6/PC7 (TIM3), PB6/PB7 (I2C1, already configured by CubeMX),
+PA13/PA14 (SWD). Newly used: **PA9/PA10 (USART1 → ODrive GPIO2/GPIO1)**, PC6/PC7 (TIM3, only
+in the `ENCODER` build), PB6/PB7 (I2C1, already configured by CubeMX),
 PE13 / LD10 (fault LED), LD3 / LD7 keep their old meaning (heartbeat / USB configured).
 
 ---
@@ -130,18 +136,33 @@ PE13 / LD10 (fault LED), LD3 / LD7 keep their old meaning (heartbeat / USB confi
 ## Firmware architecture
 
 ```
-TIM6 (1 kHz) ──► flag ──► hid_report_poll() in main loop
-                               ├─ encoder_update()  / steering_pot_update()
-                               ├─ buttons_update()  (state machine, I2C1 interrupts)
-                               ├─ build 8-byte report (Y = Z = 0)
-                               └─ send only if USB class state == CUSTOM_HID_IDLE
+main loop (never blocks)
+  ├─ every pass : odrive_link_process()  drain USART1 RX ring -> parse "pos vel" lines
+  ├─ 100 Hz     : odrive_link_request()  send "f 0\n" (read-only allowlist)
+  └─ TIM6 1 kHz flag ─► hid_report_poll()
+                           ├─ X: odrive_link_axis16() / encoder / pot (compile-time)
+                           ├─ buttons_update()  (MCP23017 core, I2C1 interrupts, 5 ms debounce)
+                           ├─ B1 held 1 s -> set steering centre
+                           ├─ hid_pack_report(): 8 bytes, Y/Z = neutral
+                           └─ send only if USB class state == CUSTOM_HID_IDLE
 ```
+
+Pure, host-tested modules (no HAL includes): `hid_pack`, `odrive_ascii`, `odrive_link`,
+`steering_map`, `debounce`, `mcp23017_core`, `centering_law` (the latter is **not** linked
+into the firmware). Hardware glue: `odrive_uart.c` (register-level USART1),
+`buttons_mcp23017.c` (HAL I2C IT), `hid_report.c`, `encoder.c`, `steering_pot.c`.
 
 | File | Purpose |
 | :--- | :--- |
 | `Core/Inc/wheel_config.h` | all tunables and build-time switches |
-| `Core/Src/encoder.c` | TIM3 x4 encoder, 32-bit accumulation, axis scaling, homing stub |
-| `Core/Src/buttons_mcp23017.c` | non-blocking MCP23017 driver + debounce + fault handling |
+| `Core/Src/odrive_uart.c` | USART1 PA9/PA10 115200 8N1, RX/TX interrupts, ring buffer, read-only TX gate |
+| `Core/Src/odrive_ascii.c` | ODrive ASCII client: strict parser, timeouts, stale flag, command allowlist |
+| `Core/Src/odrive_link.c` | ODrive position → HID X, power-up centre, set-centre, hold-on-stale |
+| `Core/Src/steering_map.c` | turns → 0..65535 (lock-to-lock, belt ratio, invert, clamping) |
+| `Core/Src/encoder.c` | (fallback) TIM3 x4 encoder on the STM32, axis scaling, homing stub |
+| `Core/Src/mcp23017_core.c` | MCP23017 state machine, mapping, simulation injection (pure) |
+| `Core/Src/debounce.c` | time-based debounce, long-press detector (pure) |
+| `Core/Src/buttons_mcp23017.c` | HAL/IRQ glue for the MCP23017 core + fault LED |
 | `Core/Src/steering_pot.c` | non-blocking potentiometer fallback |
 | `Core/Src/hid_report.c` | 1 kHz tick (TIM6), report building, USB send, simulation |
 | `Core/Src/main.c` | stays short: calls `hid_report_init()` / `hid_report_poll()` |
@@ -167,6 +188,9 @@ stays off), so the HID path can be verified with nothing wired. Y and Z stay 0.
 ---
 
 ## Changes needed in the `.ioc` (CubeMX GUI) – to be done manually
+
+> The complete, current list (including the new **USART1** for the ODrive) is in
+> `docs/IOC_TODO.md`.
 
 The project builds and runs without touching the `.ioc`, but two values in generated files
 were edited by hand and **CubeMX will overwrite them on the next code generation** unless you
@@ -226,7 +250,7 @@ Options (all default to the real hardware):
 
 | Option | Meaning |
 | :--- | :--- |
-| `-DSTEERING_SOURCE=ENCODER` (default) / `POT` | steering input |
+| `-DSTEERING_SOURCE=ODRIVE` (default) / `ENCODER` / `POT` | steering input (an existing build dir keeps its cached value – pass it explicitly once) |
 | `-DSIMULATE_INPUTS=ON` | simulated X sine + walking buttons |
 | macros in `wheel_config.h` | counts per rev, lock-to-lock, invert, debounce, … |
 
@@ -255,7 +279,9 @@ Then connect the **USB USER** port (CN5) to the computer.
 (Windows/WSL alternative: `STM32_Programmer_CLI.exe -c port=SWD -w build/Debug/steeringwheel_firmware.elf -v -rst`.)
 
 Board LEDs: **LD3** (red, PE9) blinks 1 Hz = main loop alive; **LD7** (green, PE11) on = USB
-configured; **LD10** (red, PE13) blinking fast = MCP23017 not responding.
+configured; **LD10** (red, PE13) blinking fast = MCP23017 not responding; **LD5** (orange,
+PE10) on = no/stale ODrive position (X is held); **LD9** (blue, PE12) toggles = new centre
+accepted (hold the blue user button **B1** for 1 s).
 
 ---
 
