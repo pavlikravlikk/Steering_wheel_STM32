@@ -14,11 +14,13 @@ except ImportError:
 
 # ====================== SETTINGS ======================
 VID, PID = 0x0483, 0x5752    # STM32 Steering Wheel Controller
-REPORT_FMT = "<HHHH"         # X, Y, Z (uint16) + 16 button bits, no Report ID
-REPORT_LEN = struct.calcsize(REPORT_FMT)   # 8 bytes
+REPORT_FMT = "<HHHH"         # X, Y, Z (uint16) + 16 button bits
+REPORT_LEN = struct.calcsize(REPORT_FMT)   # 8 bytes (default build, no Report ID)
+JOYSTICK_REPORT_ID = 0x01    # FFB build: Report ID 0x01 + the same 8 bytes
 AXIS_MAX = 65535
 AXIS_CENTER = AXIS_MAX / 2   # raw X value with the wheel straight
-NUM_BUTTONS = 10             # buttons 1..10 are wired (bits 0..9)
+NUM_BUTTONS = 16             # HID buttons 1..16 (1..10 wired: 8 buttons + 2 paddles)
+WIRED_BUTTONS = 10
 MAX_ANGLE = 270.0            # display angle per side (540 deg lock-to-lock)
 INVERT = False               # True if the wheel turns the wrong way
 RESPONSE = 14.0              # smoothing speed (higher = snappier)
@@ -85,6 +87,18 @@ def open_gamepad():
     except Exception as e:
         print("[HID]", e)
     return None, "Demo mode (arrows / A D, keys 1-0 = buttons)"
+
+
+def parse_report(data):
+    """Return (x, y, z, buttons) or None. Accepts the 8-byte report of the
+    default build and the 9-byte report (Report ID 0x01) of the FFB build;
+    other FFB reports (PID state etc.) are ignored."""
+    data = bytes(data)
+    if len(data) == REPORT_LEN:
+        return struct.unpack_from(REPORT_FMT, data)
+    if len(data) >= REPORT_LEN + 1 and data[0] == JOYSTICK_REPORT_ID:
+        return struct.unpack_from(REPORT_FMT, data, 1)
+    return None
 
 
 # ====================== GRAPHICS ======================
@@ -374,11 +388,13 @@ def main():
                         rep = gamepad.read(64)
                         if not rep:
                             break
-                        latest = rep
+                        parsed = parse_report(rep)
+                        if parsed is not None:
+                            latest = parsed
                 except OSError:
                     demo, device_name = True, "Device disconnected"
-                if latest and len(latest) >= REPORT_LEN:
-                    x_raw, y_raw, z_raw, buttons = struct.unpack_from(REPORT_FMT, bytes(latest))
+                if latest:
+                    x_raw, y_raw, z_raw, buttons = latest
                     axis_val = max(-1.0, min(1.0, (x_raw - AXIS_CENTER) / AXIS_CENTER))
 
             if INVERT:
@@ -416,12 +432,23 @@ def main():
             draw_text(screen, fonts["tiny"], f"X {x_raw:05d}  Y {y_raw:05d}  Z {z_raw:05d}", (bar.x, 628), (150, 160, 190))
             draw_text(screen, fonts["tiny"], f"Axis {smoothed:+.2f}", (bar.right, 628), (150, 160, 190), "topright")
 
-            # buttons 1..10 (lit = pressed)
+            # reserved pedal axes Y (throttle) and Z (brake): 0..65535
+            for row, (label, raw, col) in enumerate((("Y throttle", y_raw, (90, 230, 120)),
+                                                     ("Z brake", z_raw, (255, 90, 90)))):
+                by = 100 + row * 26
+                pygame.draw.rect(screen, (30, 32, 48), (120, by, 150, 12), border_radius=6)
+                wbar = int(150 * max(0, min(AXIS_MAX, raw)) / AXIS_MAX)
+                if wbar > 0:
+                    pygame.draw.rect(screen, col, (120, by, wbar, 12), border_radius=6)
+                draw_text(screen, fonts["micro"], label, (30, by - 1), (150, 160, 190))
+
+            # buttons 1..16 (lit = pressed; 1..10 are wired, 11..16 dimmed)
             for i in range(NUM_BUTTONS):
-                bx = WHEEL_C[0] + int((i - (NUM_BUTTONS - 1) / 2) * 32)
+                bx = WHEEL_C[0] + int((i - (NUM_BUTTONS - 1) / 2) * 29)
                 on = bool(buttons & (1 << i))
-                pygame.draw.circle(screen, (255, 210, 70) if on else (38, 42, 62), (bx, 662), 13)
-                pygame.draw.circle(screen, (230, 235, 250) if on else (80, 88, 120), (bx, 662), 13, 2)
+                idle = (38, 42, 62) if i < WIRED_BUTTONS else (26, 28, 40)
+                pygame.draw.circle(screen, (255, 210, 70) if on else idle, (bx, 662), 12)
+                pygame.draw.circle(screen, (230, 235, 250) if on else (80, 88, 120), (bx, 662), 12, 2)
                 draw_text(screen, fonts["micro"], str(i + 1), (bx, 662),
                           (20, 22, 32) if on else (150, 160, 190), "center")
 

@@ -77,6 +77,11 @@ set_source_files_properties(
     Core/Src/mcp23017_core.c
     PROPERTIES COMPILE_OPTIONS "-Wall;-Wextra")
 
+# Force-feedback sources: compiled ONLY with -DWHEEL_FFB=ON (see below).
+# Everything that can write to the ODrive lives in Core/Src/ffb.
+set(WHEEL_FFB_SOURCES
+)
+
 # Add include paths
 target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user defined include paths
@@ -93,9 +98,48 @@ set(STEERING_SOURCE "ODRIVE" CACHE STRING "Steering input: ODRIVE, ENCODER or PO
 set_property(CACHE STEERING_SOURCE PROPERTY STRINGS ODRIVE ENCODER POT)
 option(SIMULATE_INPUTS "Generate simulated inputs instead of reading hardware" OFF)
 
+#   -DWHEEL_FFB=ON                  force feedback (Core/Src/ffb). Default OFF:
+#                                   the firmware is then read-only towards the
+#                                   ODrive. See docs/FFB_SAFETY.md.
+#   -DWHEEL_FFB_ARM_ALLOWED=1       with WHEEL_FFB=ON: allow the motor to be
+#                                   armed at all (default 0 = never arms).
+option(WHEEL_FFB "Build the force-feedback module (can command the motor)" OFF)
+set(WHEEL_FFB_ARM_ALLOWED "0" CACHE STRING "1 = FFB may arm the motor (needs WHEEL_FFB=ON)")
+set_property(CACHE WHEEL_FFB_ARM_ALLOWED PROPERTY STRINGS 0 1)
+
 set(WHEEL_DEFINES STEERING_SOURCE=STEERING_SOURCE_${STEERING_SOURCE})
 if(SIMULATE_INPUTS)
     list(APPEND WHEEL_DEFINES SIMULATE_INPUTS=1)
+endif()
+if(WHEEL_FFB)
+    list(APPEND WHEEL_DEFINES WHEEL_FFB=1 WHEEL_FFB_ARM_ALLOWED=${WHEEL_FFB_ARM_ALLOWED})
+    target_sources(${CMAKE_PROJECT_NAME} PRIVATE ${WHEEL_FFB_SOURCES})
+    set_source_files_properties(${WHEEL_FFB_SOURCES} PROPERTIES COMPILE_OPTIONS "-Wall;-Wextra")
+    target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE Core/Inc/ffb)
+    message(STATUS "WHEEL_FFB=ON (WHEEL_FFB_ARM_ALLOWED=${WHEEL_FFB_ARM_ALLOWED})")
+elseif(NOT WHEEL_FFB_ARM_ALLOWED STREQUAL "0")
+    message(FATAL_ERROR "WHEEL_FFB_ARM_ALLOWED needs WHEEL_FFB=ON")
+endif()
+
+# Hardware profile -> Core/Inc/wheel_config_generated.h. The generated file is
+# committed, so a build without Python still works; with Python 3.11+ it is
+# regenerated whenever config/hardware_profile.toml changes. An invalid
+# profile fails the build on purpose.
+find_package(Python3 3.11 COMPONENTS Interpreter QUIET)
+set(WHEEL_PROFILE   ${CMAKE_CURRENT_SOURCE_DIR}/../config/hardware_profile.toml)
+set(WHEEL_GEN       ${CMAKE_CURRENT_SOURCE_DIR}/../tools/gen_config.py)
+set(WHEEL_GEN_HDR   ${CMAKE_CURRENT_SOURCE_DIR}/Core/Inc/wheel_config_generated.h)
+if(Python3_Interpreter_FOUND AND EXISTS ${WHEEL_PROFILE})
+    add_custom_command(
+        OUTPUT  ${WHEEL_GEN_HDR}
+        COMMAND ${Python3_EXECUTABLE} ${WHEEL_GEN} --header-only --quiet
+        DEPENDS ${WHEEL_PROFILE} ${WHEEL_GEN} ${CMAKE_CURRENT_SOURCE_DIR}/../tools/odrive_enums.py
+        COMMENT "Hardware profile -> wheel_config_generated.h"
+        VERBATIM)
+    add_custom_target(wheel_profile DEPENDS ${WHEEL_GEN_HDR})
+    add_dependencies(${CMAKE_PROJECT_NAME} wheel_profile)
+else()
+    message(STATUS "Python 3.11+ not found: using the committed wheel_config_generated.h")
 endif()
 
 target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE

@@ -1,0 +1,111 @@
+# =============================================================================
+# hardware_profile.toml  -  THE single source of truth for the physical setup.
+# =============================================================================
+#
+# Edit ONLY this file when the hardware changes, then run
+#     python3 tools/gen_config.py            (or just rebuild the firmware:
+#                                             CMake re-runs the generator)
+# which regenerates
+#     steeringwheel_firmware/Core/Inc/wheel_config_generated.h
+#     tools/generated/odrive_setup.py
+#     tools/generated/odrive_calibrate.py
+#
+# Every entry has:
+#   value           the number/bool/string used by the generators
+#   status          "TBD"      = placeholder, not yet checked on the real hardware
+#                   "measured" = measured / read from the real hardware
+#                   "assumed"  = deliberately chosen (a design decision), not measured
+#   how_to_measure  what to do to fill it in (see docs/HARDWARE_BRINGUP.md)
+#
+# All values below are the PLACEHOLDERS the firmware used before the belt was
+# installed. They reproduce the previous firmware behaviour exactly.
+# `python3 tools/gen_config.py --require-measured` refuses any TBD.
+# =============================================================================
+
+[meta]
+profile_version = 1
+description = "Sim-racing wheel: STM32F3Discovery + MKS ODrive Mini (0.5.x) + hoverboard hub motor"
+
+# -----------------------------------------------------------------------------
+[belt]
+# Timing belt between the motor housing (rotor) and the encoder pulley.
+teeth_housing = { value = 20, status = "TBD", how_to_measure = "Count the teeth of the toothed ring/gear on the motor housing (mark one tooth with a pen, count once around)." }
+teeth_pulley  = { value = 20, status = "TBD", how_to_measure = "Count the teeth of the pulley on the encoder shaft." }
+
+# -----------------------------------------------------------------------------
+[encoder]
+ppr          = { value = 600, status = "TBD", how_to_measure = "LPD3806-600BM: 600 pulses per revolution per channel (label). Confirm with tools/measure_counts.py: one encoder-shaft turn by hand must give 4*PPR counts." }
+quadrature   = { value = 4, status = "TBD", how_to_measure = "ODrive counts every edge of A and B (x4). Keep 4 unless the measurement says otherwise." }
+has_index    = { value = false, status = "TBD", how_to_measure = "LPD3806 has no Z/index channel. Keep false." }
+
+# -----------------------------------------------------------------------------
+[motor]
+pole_pairs       = { value = 15, status = "TBD", how_to_measure = "Hoverboard hub motor: 30 magnets = 15 pole pairs (ODrive hoverboard guide). Count magnets or check the motor data." }
+phase_resistance = { value = 0.166, status = "TBD", how_to_measure = "Read axis0.motor.config.phase_resistance after a MOTOR_CALIBRATION (ohm). Documentation only." }
+# Direct drive: the steering wheel is bolted to the motor. 1 motor turn = 1 wheel turn.
+motor_turns_per_wheel_rev = { value = 1.0, status = "TBD", how_to_measure = "Turn the steering wheel exactly one full turn and watch the motor housing: number of housing turns. 1.0 for direct drive." }
+
+# -----------------------------------------------------------------------------
+[odrive]
+# GENTLE profile applied by tools/generated/odrive_setup.py (dry run by default).
+# The firmware never writes any of these; the FFB build only READS them and
+# refuses to arm if the live value is above the value here.
+axis                         = { value = 0, status = "TBD", how_to_measure = "Axis the motor is wired to (M0 = 0)." }
+current_lim                  = { value = 4.0, status = "TBD", how_to_measure = "Amps. Start low (4 A). The precheck refuses to arm if axis0.motor.config.current_lim is higher." }
+calibration_current          = { value = 3.0, status = "TBD", how_to_measure = "Amps used by motor/encoder calibration. Must be <= current_lim. Increase only if calibration fails." }
+vel_limit                    = { value = 2.0, status = "TBD", how_to_measure = "Motor turns/s. 2 turns/s = 720 deg/s at the wheel (direct drive). The precheck refuses to arm if higher." }
+enable_torque_mode_vel_limit = { value = true, status = "TBD", how_to_measure = "Keep true: in torque mode the ODrive reduces torque above vel_limit." }
+dc_bus_overvoltage_trip_level  = { value = 30.0, status = "TBD", how_to_measure = "Volts. Supply is 24 V; regenerated energy pumps the bus up. 30 V trips well below the 56 V factory value." }
+dc_bus_undervoltage_trip_level = { value = 18.0, status = "TBD", how_to_measure = "Volts. Below this the ODrive disarms." }
+dc_max_positive_current      = { value = 6.0, status = "TBD", how_to_measure = "Amps drawn from the supply (motoring)." }
+dc_max_negative_current      = { value = -0.01, status = "TBD", how_to_measure = "Amps pushed back into the supply (regen). Negative. Kept at the 0.5.x default (-0.01 A): a lab supply cannot sink current, so any regen trips DC_BUS_OVER_REGEN_CURRENT and disarms. Raise in magnitude only with a brake resistor fitted (check odrv0.config.enable_brake_resistor / brake_resistance)." }
+watchdog_timeout             = { value = 0.25, status = "TBD", how_to_measure = "Seconds. The FFB build feeds 'u 0' every 5 ms while running. The precheck requires enable_watchdog = True and a timeout inside [ffb.watchdog_timeout_min_s, ffb.watchdog_timeout_max_s]." }
+enable_watchdog              = { value = true, status = "TBD", how_to_measure = "Required by the FFB precheck. Check on the bench whether your 0.5.x build also checks the watchdog while IDLE (docs/HARDWARE_BRINGUP.md step F3)." }
+torque_constant              = { value = 0.04, status = "TBD", how_to_measure = "Nm/A (currently saved: 0.04). Firmware READS it and converts amps -> torque units. Set 1.0 to make torque units equal amps, or 8.27/KV for real Nm (hoverboard KV is about 16)." }
+encoder_mode                 = { value = 0, status = "TBD", how_to_measure = "ENCODER_MODE_INCREMENTAL = 0." }
+
+# -----------------------------------------------------------------------------
+[wheel]
+lock_to_lock_deg = { value = 540, status = "TBD", how_to_measure = "Total steering angle from full left to full right, in degrees (design choice; 540 / 900 / 1080 are common)." }
+invert           = { value = false, status = "TBD", how_to_measure = "Turn the wheel clockwise (seen from the driver). HID X must increase. If it decreases set true." }
+centre_mode      = { value = "power_up", status = "assumed", how_to_measure = "power_up = the position at boot is the centre; B1 held 1 s re-centres. (Only option for now; no index pulse.)" }
+
+# -----------------------------------------------------------------------------
+[uart]
+baud = { value = 115200, status = "TBD", how_to_measure = "Must equal the ODrive UART baud rate (odrv0.config.uart_a_baudrate or similar). 115200 limits the FFB command rate to about 200 Hz; 921600 would allow 1 kHz (future)." }
+
+# -----------------------------------------------------------------------------
+[mcp23017]
+address_7bit = { value = 0x20, status = "TBD", how_to_measure = "A0..A2 tied to GND -> 0x20. Check with the wiring." }
+use_ipol     = { value = false, status = "assumed", how_to_measure = "false = invert in software (switch to GND = pressed). true = the chip inverts (IPOLA/IPOLB)." }
+active_low   = { value = true, status = "TBD", how_to_measure = "Buttons switch the input to GND with internal pull-ups. Documentation only (the firmware assumes active-low)." }
+
+# -----------------------------------------------------------------------------
+[ffb]
+# Force feedback limits (used only when the firmware is built with -DWHEEL_FFB=ON).
+max_amps                = { value = 1.0, status = "assumed", how_to_measure = "Hard cap of the total commanded current (A). The firmware also has a compile-time ceiling of 1.0 A (FFB_HARD_CAP_AMPS in Core/Inc/ffb/ffb_config.h)." }
+slew_amps_per_s         = { value = 5.0, status = "assumed", how_to_measure = "Maximum change of the commanded current per second." }
+spring_kp_amps_per_turn = { value = 0.5, status = "assumed", how_to_measure = "Centring spring, A per wheel turn away from centre. Gentle." }
+damper_amps_per_turn_s  = { value = 0.05, status = "assumed", how_to_measure = "A per (wheel turn/s)." }
+friction_amps           = { value = 0.03, status = "assumed", how_to_measure = "Constant friction-like force (A) opposing motion." }
+inertia_amps_per_turn_s2 = { value = 0.0, status = "assumed", how_to_measure = "Inertia compensation placeholder (0 = off)." }
+endstop_width_deg       = { value = 10.0, status = "assumed", how_to_measure = "Soft end stop: the wall builds up over this many degrees beyond +-lock_to_lock/2." }
+endstop_amps            = { value = 1.0, status = "assumed", how_to_measure = "Wall force at full width (clamped by max_amps)." }
+endstop_damping_amps_per_turn_s = { value = 0.3, status = "assumed", how_to_measure = "Extra damping inside the end-stop zone." }
+overspeed_turns_s       = { value = 3.0, status = "assumed", how_to_measure = "Wheel speed (turns/s) above which the FFB faults (no mechanical end stop, 4 kg rotating mass)." }
+vbus_min_v              = { value = 20.0, status = "assumed", how_to_measure = "Precheck/run window for vbus_voltage (24 V supply)." }
+vbus_max_v              = { value = 28.0, status = "assumed", how_to_measure = "Precheck/run window for vbus_voltage." }
+watchdog_timeout_min_s  = { value = 0.05, status = "assumed", how_to_measure = "Precheck: smallest accepted axis0.config.watchdog_timeout." }
+watchdog_timeout_max_s  = { value = 0.5, status = "assumed", how_to_measure = "Precheck: largest accepted axis0.config.watchdog_timeout." }
+command_period_ms       = { value = 5, status = "assumed", how_to_measure = "ODrive command cycle (torque + watchdog + position request). 5 ms = 200 Hz is the most 115200 baud can carry." }
+stale_ms                = { value = 50, status = "assumed", how_to_measure = "No fresh position for this long while running -> FAULT." }
+arm_hold_ms             = { value = 3000, status = "assumed", how_to_measure = "Arm gesture: hold B1 + both paddles this long." }
+
+# -----------------------------------------------------------------------------
+[pins]
+# Documentation only (the firmware pin usage is fixed in code / the .ioc).
+usb       = { value = "PA11 = USB_DM, PA12 = USB_DP (USB USER connector)", status = "measured", how_to_measure = "STM32F3Discovery schematic." }
+uart_tx   = { value = "PA9 = USART1_TX -> ODrive GPIO2 (RX)", status = "TBD", how_to_measure = "Check wiring with a multimeter (docs/BENCH_CHECKLIST.md step 4)." }
+uart_rx   = { value = "PA10 = USART1_RX <- ODrive GPIO1 (TX)", status = "TBD", how_to_measure = "Check wiring with a multimeter (docs/BENCH_CHECKLIST.md step 4)." }
+i2c       = { value = "PB6 = I2C1_SCL, PB7 = I2C1_SDA (MCP23017)", status = "TBD", how_to_measure = "Check wiring." }
+b1        = { value = "PA0 = blue user button B1 (set centre / arm gesture)", status = "measured", how_to_measure = "Discovery board." }
