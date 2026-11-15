@@ -80,6 +80,10 @@ With both boards powered but the signal wires **not** yet connected:
    `hw_errors` ≈ 0. `p 'odrive_link.c'::s_odr.pos_turns`.
 6. While this runs, in `odrivetool`: `odrv0.axis0.current_state` stays `1`, errors stay `0`
    (proves the STM32 changes nothing).
+7. Troubleshooting: LD5 stays on although wired → check TX/RX not swapped, GND, baud and UART
+   enable on the ODrive. If `parse_errors` climbs, the ODrive answers something non-numeric
+   (e.g. `nan` while the encoder is not ready, or `invalid ...`) — the firmware rejects it on
+   purpose; check with the USB-UART adapter what `f 0` returns.
 
 ## 6. Set centre
 1. Turn the encoder away from centre, hold **B1 ≥ 1 s** → **LD9 (blue) toggles**, X jumps to
