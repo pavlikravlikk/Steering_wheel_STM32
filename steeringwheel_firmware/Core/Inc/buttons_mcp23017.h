@@ -1,6 +1,7 @@
 /**
  * @file    buttons_mcp23017.h
  * @brief   Non-blocking button reader for an MCP23017 on I2C1 (interrupt driven).
+ *          Logic in mcp23017_core.c (host-tested); this API is the HAL glue.
  *
  * Button map (bit in the HID button field, 1 = pressed):
  *   GPA0..GPA7 -> bits 0..7  (buttons 1..8)
@@ -24,7 +25,12 @@ void buttons_update(uint32_t now_ms);
 /** Debounced button mask, bits 0..9, 1 = pressed. 0 while the chip is absent. */
 uint16_t buttons_get(void);
 
-/** true once the expander answered and is configured. */
+/** true once the expander answered and is configured (or simulated). */
 bool buttons_is_present(void);
+
+/** Simulation: bypass I2C and inject a raw mask (1 = pressed, bits 0..9);
+ *  the injected state still goes through the 5 ms debounce. */
+void buttons_sim_enable(bool on);
+void buttons_sim_set(uint16_t raw_pressed_mask);
 
 #endif /* BUTTONS_MCP23017_H */

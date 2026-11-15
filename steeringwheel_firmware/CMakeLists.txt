@@ -55,6 +55,7 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     Core/Src/odrive_uart.c
     Core/Src/steering_map.c
     Core/Src/debounce.c
+    Core/Src/mcp23017_core.c
 )
 
 # Be strict with our own sources (generated CubeMX code keeps default flags)
@@ -69,6 +70,7 @@ set_source_files_properties(
     Core/Src/odrive_uart.c
     Core/Src/steering_map.c
     Core/Src/debounce.c
+    Core/Src/mcp23017_core.c
     PROPERTIES COMPILE_OPTIONS "-Wall;-Wextra")
 
 # Add include paths

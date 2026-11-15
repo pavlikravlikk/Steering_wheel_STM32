@@ -10,7 +10,8 @@ FW_SRCS := $(FW)/Src/hid_pack.c \
            $(FW)/Src/odrive_ascii.c \
            $(FW)/Src/steering_map.c \
            $(FW)/Src/odrive_link.c \
-           $(FW)/Src/debounce.c
+           $(FW)/Src/debounce.c \
+           $(FW)/Src/mcp23017_core.c
 
 TEST_SRCS := $(wildcard test_*.c) $(wildcard mock_*.c)
 

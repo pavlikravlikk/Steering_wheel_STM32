@@ -177,12 +177,12 @@ void hid_report_init(void)
   debounce_init(&s_b1_debounce, 1U, BUTTON_DEBOUNCE_MS, 0U);
   hold_init(&s_b1_hold, SET_CENTRE_HOLD_MS);
 
+  buttons_init(&hi2c1);
 #if !SIMULATE_INPUTS
   steering_init();
-  buttons_init(&hi2c1);
 #else
   (void)hadc1;
-  (void)hi2c1;
+  buttons_sim_enable(true);    /* walking pattern injected through the debouncer */
 #endif
 
   tick_timer_start();
@@ -226,13 +226,13 @@ void hid_report_poll(void)
 
   /* 1. Collect state. */
 #if SIMULATE_INPUTS
-  s_report.x       = simulated_x(s_ms);
-  s_report.buttons = simulated_buttons(s_ms);
+  s_report.x = simulated_x(s_ms);
+  buttons_sim_set(simulated_buttons(s_ms));
 #else
   s_report.x = steering_axis16();
-  buttons_update(s_ms);
-  s_report.buttons = buttons_get();
 #endif
+  buttons_update(s_ms);              /* MCP23017 scan (or simulation) + 5 ms debounce */
+  s_report.buttons = buttons_get();
   s_report.y = HID_AXIS_Y_NEUTRAL;   /* throttle: reserved for the future pedals */
   s_report.z = HID_AXIS_Z_NEUTRAL;   /* brake:    reserved for the future pedals */
 
