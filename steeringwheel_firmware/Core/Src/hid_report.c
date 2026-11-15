@@ -6,6 +6,7 @@
 
 #include "buttons_mcp23017.h"
 #include "encoder.h"
+#include "hid_pack.h"
 #include "main.h"
 #include "steering_pot.h"
 #include "usbd_customhid.h"
@@ -23,8 +24,10 @@ _Static_assert(USBD_CUSTOM_HID_REPORT_DESC_SIZE == 42U,
 _Static_assert(CUSTOM_HID_FS_BINTERVAL == 1U,
                "HID polling interval must be 1 ms (update FS binterval in .ioc)");
 _Static_assert(sizeof(JoystickReport_t) == 8U, "HID report must be 8 bytes");
+_Static_assert(HID_REPORT_SIZE == sizeof(JoystickReport_t), "hid_pack and descriptor disagree");
 
-static JoystickReport_t s_report;          /* static: valid for the whole DMA/PMA copy */
+static JoystickReport_t s_report;          /* logical values (host byte order)          */
+static uint8_t          s_tx[HID_REPORT_SIZE]; /* packed bytes; static: valid for the PMA copy */
 static volatile uint8_t s_tick_pending;
 static uint32_t         s_ms;
 static uint32_t         s_heartbeat_ms;
@@ -162,15 +165,16 @@ void hid_report_poll(void)
   buttons_update(s_ms);
   s_report.buttons = buttons_get();
 #endif
-  s_report.y = 0U;     /* throttle: reserved for the future pedals */
-  s_report.z = 0U;     /* brake:    reserved for the future pedals */
+  s_report.y = HID_AXIS_Y_NEUTRAL;   /* throttle: reserved for the future pedals */
+  s_report.z = HID_AXIS_Z_NEUTRAL;   /* brake:    reserved for the future pedals */
 
   heartbeat_leds(s_ms);
 
   /* 2. Send only when the previous IN transfer has completed. */
   if (usb_ready_for_report() != 0U)
   {
-    (void)USBD_CUSTOM_HID_SendReport(&hUsbDeviceFS, (uint8_t *)&s_report,
-                                     (uint16_t)sizeof(s_report));
+    hid_pack_report(s_tx, s_report.x, s_report.y, s_report.z,
+                    s_report.buttons, BUTTON_COUNT);
+    (void)USBD_CUSTOM_HID_SendReport(&hUsbDeviceFS, s_tx, (uint16_t)sizeof(s_tx));
   }
 }

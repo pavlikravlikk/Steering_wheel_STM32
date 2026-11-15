@@ -12,10 +12,11 @@
 /* Input source selection                                                    */
 /* ------------------------------------------------------------------------- */
 #define STEERING_SOURCE_POT      1   /* potentiometer on PA1 (ADC1_IN2)      */
-#define STEERING_SOURCE_ENCODER  2   /* LPD3806 quadrature encoder on TIM3   */
+#define STEERING_SOURCE_ENCODER  2   /* encoder wired to the STM32 TIM3 (old) */
+#define STEERING_SOURCE_ODRIVE   3   /* position read from the ODrive (UART)  */
 
 #ifndef STEERING_SOURCE
-#define STEERING_SOURCE          STEERING_SOURCE_ENCODER
+#define STEERING_SOURCE          STEERING_SOURCE_ODRIVE
 #endif
 
 /* 1 = generate a sine wave on X and toggle buttons one by one, touch no
@@ -33,7 +34,8 @@
 #define ENCODER_COUNTS_PER_WHEEL_REV  2400
 #endif
 
-/* Total wheel rotation from full left lock to full right lock, in degrees. */
+/* Total wheel rotation from full left lock to full right lock, in degrees.
+ * Used by the ENCODER and ODRIVE sources. TODO(TBD): confirm 540. */
 #ifndef WHEEL_LOCK_TO_LOCK_DEG
 #define WHEEL_LOCK_TO_LOCK_DEG        540
 #endif
@@ -63,6 +65,67 @@
 
 /* I2C1 TIMINGR for 400 kHz with I2C1CLK = SYSCLK = 48 MHz (see README). */
 #define I2C1_TIMING_400KHZ_48MHZ      0x10930F20UL
+
+/* 1 = the chip inverts the inputs itself (IPOLA/IPOLB = 0xFF), 0 = invert in
+ * software. Both give 1 = pressed in the report. */
+#ifndef MCP23017_USE_IPOL
+#define MCP23017_USE_IPOL             0
+#endif
+
+/* ------------------------------------------------------------------------- */
+/* HID report                                                                */
+/* ------------------------------------------------------------------------- */
+/* Reserved pedal axes: value reported until the pedals exist. 0 = released. */
+#ifndef HID_AXIS_Y_NEUTRAL
+#define HID_AXIS_Y_NEUTRAL            0U     /* throttle (SS49E Hall, later)  */
+#endif
+#ifndef HID_AXIS_Z_NEUTRAL
+#define HID_AXIS_Z_NEUTRAL            0U     /* brake (load cell + HX711)     */
+#endif
+
+/* "Set centre": hold the blue user button B1 (PA0) this long. */
+#ifndef SET_CENTRE_HOLD_MS
+#define SET_CENTRE_HOLD_MS            1000U
+#endif
+
+/* ------------------------------------------------------------------------- */
+/* ODrive link (USART1: PA9 = TX -> ODrive GPIO2, PA10 = RX <- ODrive GPIO1)  */
+/* READ-ONLY: the firmware only ever sends "f <axis>" and "r <path>".         */
+/* ------------------------------------------------------------------------- */
+#ifndef ODRIVE_UART_BAUD
+#define ODRIVE_UART_BAUD              115200U
+#endif
+
+#ifndef ODRIVE_AXIS
+#define ODRIVE_AXIS                   0      /* axis0 */
+#endif
+
+/* Request period: 10 ms = 100 Hz (5 ms = 200 Hz). */
+#ifndef ODRIVE_POLL_PERIOD_MS
+#define ODRIVE_POLL_PERIOD_MS         10U
+#endif
+
+/* No reply within this time -> count a timeout, allow the next request. */
+#ifndef ODRIVE_REPLY_TIMEOUT_MS
+#define ODRIVE_REPLY_TIMEOUT_MS       8U
+#endif
+
+/* No valid position for this long -> data is flagged stale. */
+#ifndef ODRIVE_STALE_MS
+#define ODRIVE_STALE_MS               100U
+#endif
+
+/* TODO(TBD): ODrive "turns" (encoder turns through the placeholder cpr) per
+ * one turn of the wheel. Depends on the belt tooth ratio, which is unknown
+ * until the belt is installed. 1.0 = encoder turns 1:1 with the wheel. */
+#ifndef ODRIVE_TURNS_PER_WHEEL_REV
+#define ODRIVE_TURNS_PER_WHEEL_REV    1.0f
+#endif
+
+/* TODO(TBD): 1 = swap the steering direction of the ODrive source. */
+#ifndef ODRIVE_INVERT_DIRECTION
+#define ODRIVE_INVERT_DIRECTION       0
+#endif
 
 /* ------------------------------------------------------------------------- */
 /* Potentiometer fallback (PA1)                                              */

@@ -49,6 +49,7 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     Core/Src/buttons_mcp23017.c
     Core/Src/steering_pot.c
     Core/Src/hid_report.c
+    Core/Src/hid_pack.c
 )
 
 # Be strict with our own sources (generated CubeMX code keeps default flags)
@@ -57,6 +58,7 @@ set_source_files_properties(
     Core/Src/buttons_mcp23017.c
     Core/Src/steering_pot.c
     Core/Src/hid_report.c
+    Core/Src/hid_pack.c
     PROPERTIES COMPILE_OPTIONS "-Wall;-Wextra")
 
 # Add include paths
