@@ -21,19 +21,28 @@ def set_val(p, section, key, value):
 
 def module_from_source(name, src):
     mod = types.ModuleType(name)
+    mod.__file__ = os.path.join(REPO, "tools", "generated", name + ".py")   # where it really lives
     exec(compile(src, name, "exec"), mod.__dict__)
     return mod
 
 
+REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+DUMP = os.path.join(REPO, "docs", "odrive_dump.txt")
+
+
+def real_values():
+    import odrive_dump
+    with open(DUMP, encoding="utf-8") as f:
+        return odrive_dump.parse_dump(f.read())
+
+
 def ready_values(p):
-    """Values of a calibrated, IDLE ODrive with the profile applied."""
-    vals = {path: value for path, value in gen_config.setup_settings(p)}
-    vals.update({
-        "vbus_voltage": 24.0, "error": 0, "axis0.error": 0, "axis0.motor.error": 0,
-        "axis0.encoder.error": 0, "axis0.controller.error": 0, "axis0.current_state": 1,
-        "axis0.requested_state": 0, "axis0.motor.is_calibrated": True, "axis0.encoder.is_ready": True,
-        "axis0.motor.config.pre_calibrated": False,
-    })
+    """The REAL dump (docs/odrive_dump.txt) with the profile applied, errors
+    cleared and the encoder calibrated: an IDLE ODrive ready for the scripts."""
+    vals = real_values()
+    vals.update({path: value for path, value in gen_config.setup_settings(p)})
+    vals.update({"axis0.error": 0, "axis0.motor.error": 0, "axis0.encoder.error": 0,
+                 "axis0.encoder.is_ready": True, "axis0.motor.is_calibrated": True})
     return vals
 
 
@@ -156,16 +165,37 @@ class TestSetupScript(unittest.TestCase):
         self.p = load()
         self.mod = module_from_source("odrive_setup", gen_config.gen_setup_script(self.p))
 
-    def test_dry_run_prints_commands_and_connects_to_nothing(self):
+    def test_dry_run_diffs_against_the_real_dump_and_connects_to_nothing(self):
         def boom():
             raise AssertionError("dry run must not connect")
         self.mod.connect = boom
         buf = io.StringIO()
         with redirect_stdout(buf):
-            self.assertEqual(self.mod.main([]), 0)
+            self.assertEqual(self.mod.main(["--dump", DUMP]), 0)
         out = buf.getvalue()
         self.assertIn("DRY RUN", out)
+        self.assertNotIn("PARSE WARN", out)
+        self.assertNotIn("NOT IN DUMP", out)
+        # old -> new against the real saved values
+        self.assertRegex(out, r"axis0\.motor\.config\.current_lim\s+12\.0\s+4\.0\s+<-- change")
+        self.assertRegex(out, r"axis0\.controller\.config\.control_mode\s+3\s+1\s+<-- change")
+        self.assertRegex(out, r"axis0\.config\.startup_closed_loop_control\s+True\s+False\s+<-- change")
+        self.assertRegex(out, r"config\.dc_max_negative_current\s+-3\.0\s+-3\.0\n")   # unchanged
         self.assertIn("odrv0.axis0.motor.config.current_lim = 4.0", out)
+        self.assertNotIn("odrv0.config.dc_max_negative_current", out)              # no change -> no command
+        self.assertNotIn("odrv0.axis0.motor.config.pole_pairs", out)
+        self.assertIn("12 change(s)", out)
+
+    def test_dry_run_without_dump_lists_everything(self):
+        buf = io.StringIO()
+        with redirect_stdout(buf):
+            self.assertEqual(self.mod.main(["--dump", "/nonexistent"]), 0)
+        self.assertIn("odrv0.axis0.motor.config.pole_pairs = 15", buf.getvalue())
+
+    def test_settings_never_touch_brake_or_uart(self):
+        for path, _ in self.mod.SETTINGS:
+            for token in ("brake", "regen", "uart", "requested_state", "pre_calibrated", "direction"):
+                self.assertNotIn(token, path)
 
     def test_never_requests_state_or_motion(self):
         for path, _ in self.mod.SETTINGS:
@@ -208,6 +238,18 @@ class TestSetupScript(unittest.TestCase):
             odrv = FakeODrive(vals)
             self.assertEqual(self.mod.apply(odrv, write=True, out=lambda s: None), 2, key)
             self.assertEqual(odrv.writes, [], key)
+
+    def test_apply_against_real_dump_writes_exactly_the_dry_run_changes(self):
+        odrv = FakeODrive(real_values())
+        rc = self.mod.apply(odrv, write=True, out=lambda s: None)
+        # the real dump has errors set but the axis is IDLE and vbus is in range:
+        # the setup itself is allowed (it changes no motion state)
+        self.assertEqual(rc, 0)
+        self.assertEqual(len(odrv.writes), 12)
+        self.assertEqual(odrv.calls, [])
+        written = dict(odrv.writes)
+        self.assertEqual(written["axis0.config.startup_closed_loop_control"], False)
+        self.assertNotIn("config.dc_max_negative_current", written)
 
     def test_missing_paths_are_skipped(self):
         vals = ready_values(self.p)

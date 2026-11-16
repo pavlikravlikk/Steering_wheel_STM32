@@ -1,7 +1,0 @@
-# SYNTHETIC fixture (not a real dump): device-level values for the factory state.
-odrv0.vbus_voltage = 24.08
-odrv0.error = 0
-odrv0.config.dc_bus_overvoltage_trip_level = 56.0
-odrv0.config.dc_bus_undervoltage_trip_level = 8.0
-odrv0.config.dc_max_positive_current = 10.0
-odrv0.config.dc_max_negative_current = -0.01

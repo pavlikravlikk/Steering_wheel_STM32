@@ -52,6 +52,8 @@ typedef enum
   FFB_REASON_TORQUE_CONSTANT_RANGE = 17,
   FFB_REASON_NOT_CHECKED_YET = 18,
   FFB_REASON_READ_ERROR = 19,           /* a property read was refused        */
+  FFB_REASON_NOT_IDLE = 20,             /* axis not IDLE before arming (e.g.
+                                           startup_closed_loop_control True)  */
   FFB_REASON_COUNT
 } ffb_reason_t;
 

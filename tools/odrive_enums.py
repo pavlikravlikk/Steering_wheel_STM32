@@ -4,10 +4,13 @@ Source: the official ODrive 0.5.6 API reference (docs.odriverobotics.com,
 v/0.5.6/fibre_types/com_odriverobotics_ODrive.html), cross-checked with 0.5.4.
 Written from the documentation tables, not copied from code.
 
-CAUTION: the MKS ODrive Mini runs an *unnumbered* 0.5.x-family firmware.
-Bit assignments changed between 0.5.1 and 0.5.2 (DC-bus bits moved from the
-axis to the device-level ``error``). Treat decoded names as a strong hint, and
-confirm against ``odrv0.axis0.error`` printed by odrivetool (TODO(TBD)).
+CAUTION: the MKS ODrive Mini runs an *unnumbered* dev build (fw 0.0.0,
+unreleased). docs/odrive_dump.txt shows an early 0.5.x API (see
+firmware_family()). Bit assignments changed between 0.5.1 and 0.5.2 (DC-bus
+bits moved from the axis to a device-level ``error``, which this build does
+not have). The bits seen in the real dump (axis 0x100, motor 0x10, encoder
+0x4) have the same names in both generations. For other bits treat names as a
+hint and confirm with odrivetool's dump_errors(odrv0) (TODO(TBD)).
 """
 
 AXIS_ERRORS = {
@@ -76,6 +79,18 @@ MOTOR_ERRORS = {
     0x800000000: "UNBALANCED_PHASES",
 }
 
+# Bits used only by older 0.5.x builds (names from memory of the 0.5.1 enums,
+# UNVERIFIED; only shown for bits the 0.5.6 table does not define).
+MOTOR_ERRORS_LEGACY = {
+    0x4: "ADC_FAILED (0.5.1 name, unverified)",
+    0x20: "NOT_IMPLEMENTED_MOTOR_TYPE (0.5.1 name, unverified)",
+    0x40: "BRAKE_CURRENT_OUT_OF_RANGE (0.5.1 name, unverified)",
+    0x100: "BRAKE_DEADTIME_VIOLATION (0.5.1 name, unverified)",
+    0x200: "UNEXPECTED_TIMER_CALLBACK (0.5.1 name, unverified)",
+    0x4000: "DC_BUS_OVER_REGEN_CURRENT (0.5.1 name, unverified)",
+    0x8000: "DC_BUS_OVER_CURRENT (0.5.1 name, unverified)",
+}
+
 ENCODER_ERRORS = {
     0x1: "UNSTABLE_GAIN",
     0x2: "CPR_POLEPAIRS_MISMATCH",
@@ -123,6 +138,11 @@ CONTROL_MODES = {
     3: "POSITION_CONTROL",
 }
 
+INPUT_MODES = {
+    0: "INACTIVE", 1: "PASSTHROUGH", 2: "VEL_RAMP", 3: "POS_FILTER", 4: "MIX_CHANNELS",
+    5: "TRAP_TRAJ", 6: "TORQUE_RAMP", 7: "MIRROR",
+}
+
 AXIS_STATE_IDLE = 1
 AXIS_STATE_MOTOR_CALIBRATION = 4
 AXIS_STATE_ENCODER_OFFSET_CALIBRATION = 7
@@ -165,5 +185,22 @@ def decode_register(path, value):
     table = ERROR_REGISTERS.get(key)
     if table is None:
         return ["0x%X" % int(value)]
-    legacy = AXIS_ERRORS_LEGACY if key == "axis0.error" else None
+    legacy = {"axis0.error": AXIS_ERRORS_LEGACY, "axis0.motor.error": MOTOR_ERRORS_LEGACY}.get(key)
     return decode_flags(value, table, legacy)
+
+
+def firmware_family(values):
+    """Guess the 0.5.x API generation from which properties a dump contains.
+
+    docs/odrive_dump.txt (unnumbered dev build) has config.enable_uart,
+    config.max_regen_current, controller.config.enable_current_mode_vel_limit
+    and no device-level 'error' -> an early 0.5.x (0.5.1-like) API."""
+    early = ("config.enable_uart" in values or "config.max_regen_current" in values
+             or "axis0.controller.config.enable_current_mode_vel_limit" in values)
+    late = ("error" in values or "config.enable_brake_resistor" in values
+            or "axis0.controller.config.enable_torque_mode_vel_limit" in values)
+    if early and not late:
+        return "early 0.5.x (0.5.1-like)"
+    if late and not early:
+        return "late 0.5.x (0.5.2+)"
+    return "unknown"

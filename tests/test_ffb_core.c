@@ -522,6 +522,8 @@ TEST(test_precheck_each_condition)
     { FFB_PC_ENCODER_ERROR, 2.0f, FFB_REASON_ENCODER_ERROR },
     { FFB_PC_VBUS, 31.0f, FFB_REASON_VBUS_RANGE },
     { FFB_PC_VBUS, 12.0f, FFB_REASON_VBUS_RANGE },
+    { FFB_PC_CURRENT_STATE, 8.0f, FFB_REASON_NOT_IDLE },   /* already closed loop */
+    { FFB_PC_CURRENT_STATE, 7.0f, FFB_REASON_NOT_IDLE },   /* calibrating         */
   };
   ffb_limits_t lim;
   ffb_pc_context_t c = ctx_ok();

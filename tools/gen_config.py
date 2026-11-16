@@ -54,6 +54,8 @@ RANGES = [
     ("odrive", "dc_bus_undervoltage_trip_level", float, 8.0, 50.0),
     ("odrive", "dc_max_positive_current", float, 0.5, 30.0),
     ("odrive", "dc_max_negative_current", float, -30.0, 0.0),
+    ("odrive", "brake_resistance", float, 0.0, 100.0),
+    ("odrive", "max_regen_current", float, 0.0, 30.0),
     ("odrive", "watchdog_timeout", float, 0.01, 5.0),
     ("odrive", "torque_constant", float, 0.001, 10.0),
     ("odrive", "encoder_mode", int, 0, 0x100),
@@ -192,7 +194,8 @@ def validate(p, require_measured=False):
         if not (lo <= v <= hi) or (isinstance(v, float) and not math.isfinite(v)):
             errors.append("%s.%s = %r outside the allowed range [%s, %s]" % (section, key, v, lo, hi))
     for section, key in (("wheel", "invert"), ("encoder", "has_index"), ("mcp23017", "use_ipol"),
-                         ("odrive", "enable_watchdog"), ("odrive", "enable_torque_mode_vel_limit")):
+                         ("odrive", "enable_watchdog"), ("odrive", "enable_current_mode_vel_limit"),
+                         ("odrive", "enable_overspeed_error")):
         try:
             v = val(p, section, key)
             if not isinstance(v, bool):
@@ -359,7 +362,8 @@ def setup_settings(p):
         (ax + ".encoder.config.cpr", int(d["cpr"])),
         (ax + ".encoder.config.use_index", bool(val(p, "encoder", "has_index"))),
         (ax + ".controller.config.vel_limit", float(o("vel_limit"))),
-        (ax + ".controller.config.enable_torque_mode_vel_limit", bool(o("enable_torque_mode_vel_limit"))),
+        (ax + ".controller.config.enable_current_mode_vel_limit", bool(o("enable_current_mode_vel_limit"))),
+        (ax + ".controller.config.enable_overspeed_error", bool(o("enable_overspeed_error"))),
         (ax + ".controller.config.control_mode", odrive_enums.CONTROL_MODE_TORQUE_CONTROL),
         (ax + ".controller.config.input_mode", 1),  # INPUT_MODE_PASSTHROUGH
         (ax + ".config.watchdog_timeout", float(o("watchdog_timeout"))),
@@ -370,6 +374,18 @@ def setup_settings(p):
         ("config.dc_max_negative_current", float(o("dc_max_negative_current"))),
     ]
 
+
+
+def check_only_settings(p):
+    """(path, expected value) compared by odrive_status.py but NEVER written by
+    odrive_setup.py (brake/regen and UART settings are a human decision)."""
+    o = lambda k: val(p, "odrive", k)  # noqa: E731
+    return [
+        ("config.brake_resistance", float(o("brake_resistance"))),
+        ("config.max_regen_current", float(o("max_regen_current"))),
+        ("config.enable_uart", True),
+        ("config.uart_baudrate", int(val(p, "uart", "baud"))),
+    ]
 
 _SCRIPT_COMMON = r'''
 ERROR_TABLES = {ERROR_TABLES}
@@ -443,6 +459,15 @@ def check_safe_to_touch(odrv):
 '''
 
 
+def _dump_parser_source():
+    """tools/odrive_dump.py without its module docstring, for embedding."""
+    with open(os.path.join(HERE, "odrive_dump.py"), "r", encoding="utf-8") as f:
+        src = f.read()
+    if src.startswith('"""'):
+        src = src[src.index('"""', 3) + 3:].lstrip("\n")
+    return src.rstrip("\n")
+
+
 def gen_setup_script(p):
     settings = setup_settings(p)
     ax = val(p, "odrive", "axis")
@@ -456,7 +481,9 @@ def gen_setup_script(p):
 
 Apply the GENTLE ODrive profile.
 
-    python3 tools/generated/odrive_setup.py            # DRY RUN: print the odrivetool commands
+    python3 tools/generated/odrive_setup.py            # DRY RUN: old -> new against docs/odrive_dump.txt
+                                                       #   + the odrivetool commands; connects to nothing
+    python3 tools/generated/odrive_setup.py --dump F   # DRY RUN against another saved dump
     python3 tools/generated/odrive_setup.py --read     # connect, show old -> new, write nothing
     python3 tools/generated/odrive_setup.py --apply    # connect, check IDLE + vbus, write, verify
     python3 tools/generated/odrive_setup.py --apply --save   # ... and save_configuration()
@@ -465,15 +492,49 @@ Never requests any motion or state change. Never saves unless --save is given.
 Paths that do not exist on this firmware build are skipped with a warning.
 """
 import argparse
+import os
 import sys
 
 SETTINGS = [
 %s
 ]
+DEFAULT_DUMP = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "docs",
+                                             "odrive_dump.txt"))
 %s
+# ---- dump parser (copied from tools/odrive_dump.py by the generator) ----
+%s
+# -------------------------------------------------------------------------
 
 def plan_lines():
     return ["odrv0.%%s = %%r" %% (path, value) for path, value in SETTINGS]
+
+
+def _same(old, new):
+    if isinstance(new, bool) or isinstance(old, bool):
+        return bool(old) == bool(new) and isinstance(old, (bool, int))
+    if isinstance(new, float):
+        try:
+            return abs(float(old) - new) <= 1e-4 * max(1.0, abs(new))
+        except (TypeError, ValueError):
+            return False
+    return old == new
+
+
+def dry_run_diff(dump_values, out=print):
+    """Old (saved, from the dump) -> new (profile). Returns the number of changes."""
+    changes = 0
+    out("# %%-58s %%-22s %%s" %% ("parameter", "dump (saved)", "profile (new)"))
+    for path, new in SETTINGS:
+        if path not in dump_values:
+            out("  %%-58s %%-22s %%r   <-- NOT IN DUMP: would be skipped" %% (path, "-", new))
+            continue
+        old = dump_values[path]
+        if _same(old, new):
+            out("  %%-58s %%-22r %%r" %% (path, old, new))
+        else:
+            changes += 1
+            out("  %%-58s %%-22r %%r   <-- change" %% (path, old, new))
+    return changes
 
 
 def apply(odrv, write=False, save=False, out=print):
@@ -493,9 +554,9 @@ def apply(odrv, write=False, save=False, out=print):
             out("  SKIP %%-55s (not present on this firmware)" %% path)
             continue
         old = read(odrv, path)
-        mark = "" if old == new else "   <-- change"
+        mark = "" if _same(old, new) else "   <-- change"
         out("  %%-55s %%r -> %%r%%s" %% (path, old, new, mark))
-        if write and old != new:
+        if write and not _same(old, new):
             parent, name = resolve(odrv, path)
             setattr(parent, name, new)
             back = getattr(parent, name)
@@ -519,13 +580,27 @@ def main(argv=None):
     ap.add_argument("--read", action="store_true", help="connect and compare, write nothing")
     ap.add_argument("--apply", action="store_true", help="write the values (RAM only)")
     ap.add_argument("--save", action="store_true", help="with --apply: also save_configuration()")
+    ap.add_argument("--dump", default=DEFAULT_DUMP, help="dry run: saved dump to diff against")
     a = ap.parse_args(argv)
     if a.save and not a.apply:
         ap.error("--save needs --apply")
     if not (a.read or a.apply):
-        print("# DRY RUN - nothing is sent. Commands for odrivetool:")
-        for line in plan_lines():
-            print(line)
+        print("# DRY RUN - nothing is sent, nothing is connected.")
+        changed = SETTINGS
+        if a.dump and os.path.exists(a.dump):
+            with open(a.dump, "r", encoding="utf-8", errors="replace") as fh:
+                dump_values, problems = parse_dump_report(fh.read())
+            print("# Old values: %%s (saved state when the dump was made; re-check live with --read)" %% a.dump)
+            for no, line, why in problems:
+                print("# PARSE WARN line %%d: %%s [%%s]" %% (no, line.strip()[:70], why))
+            n = dry_run_diff(dump_values)
+            print("# %%d change(s)." %% n)
+            changed = [(p, v) for p, v in SETTINGS if p in dump_values and not _same(dump_values[p], v)]
+        else:
+            print("# (no dump found: listing every setting)")
+        print("# Commands for odrivetool (only the changes):")
+        for path, value in changed:
+            print("odrv0.%%s = %%r" %% (path, value))
         print("# (then, only if you want it permanent: odrv0.save_configuration())")
         return 0
     odrv = connect()
@@ -534,7 +609,7 @@ def main(argv=None):
 
 if __name__ == "__main__":
     sys.exit(main())
-''' % ("\n".join(lines), common))
+''' % ("\n".join(lines), common, _dump_parser_source()))
 
 
 def gen_calibrate_script(p):

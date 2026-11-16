@@ -16,9 +16,11 @@ void run_ffb_service_tests(void);
 void run_ffb_desc_tests(void);
 void run_ffb_pid_tests(void);
 void run_extras_tests(void);
+void run_ffb_dump_tests(void);
 
 int main(void)
 {
+  run_ffb_dump_tests();
   run_extras_tests();
   run_ffb_core_tests();
   run_ffb_service_tests();

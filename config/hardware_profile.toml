@@ -41,7 +41,7 @@ has_index    = { value = false, status = "TBD", how_to_measure = "LPD3806 has no
 # -----------------------------------------------------------------------------
 [motor]
 pole_pairs       = { value = 15, status = "TBD", how_to_measure = "Hoverboard hub motor: 30 magnets = 15 pole pairs (ODrive hoverboard guide). Count magnets or check the motor data." }
-phase_resistance = { value = 0.166, status = "TBD", how_to_measure = "Read axis0.motor.config.phase_resistance after a MOTOR_CALIBRATION (ohm). Documentation only." }
+phase_resistance = { value = 0.166, status = "measured", how_to_measure = "Read axis0.motor.config.phase_resistance after a MOTOR_CALIBRATION (ohm). Documentation only." }
 # Direct drive: the steering wheel is bolted to the motor. 1 motor turn = 1 wheel turn.
 motor_turns_per_wheel_rev = { value = 1.0, status = "TBD", how_to_measure = "Turn the steering wheel exactly one full turn and watch the motor housing: number of housing turns. 1.0 for direct drive." }
 
@@ -50,18 +50,21 @@ motor_turns_per_wheel_rev = { value = 1.0, status = "TBD", how_to_measure = "Tur
 # GENTLE profile applied by tools/generated/odrive_setup.py (dry run by default).
 # The firmware never writes any of these; the FFB build only READS them and
 # refuses to arm if the live value is above the value here.
-axis                         = { value = 0, status = "TBD", how_to_measure = "Axis the motor is wired to (M0 = 0)." }
+axis                         = { value = 0, status = "measured", how_to_measure = "docs/odrive_dump.txt: the motor calibration (phase_resistance 0.166 ohm, is_calibrated True) is on axis0." }
 current_lim                  = { value = 4.0, status = "TBD", how_to_measure = "Amps. Start low (4 A). The precheck refuses to arm if axis0.motor.config.current_lim is higher." }
 calibration_current          = { value = 3.0, status = "TBD", how_to_measure = "Amps used by motor/encoder calibration. Must be <= current_lim. Increase only if calibration fails." }
 vel_limit                    = { value = 2.0, status = "TBD", how_to_measure = "Motor turns/s. 2 turns/s = 720 deg/s at the wheel (direct drive). The precheck refuses to arm if higher." }
-enable_torque_mode_vel_limit = { value = true, status = "TBD", how_to_measure = "Keep true: in torque mode the ODrive reduces torque above vel_limit." }
+enable_current_mode_vel_limit = { value = true, status = "TBD", how_to_measure = "Name in THIS build (docs/odrive_dump.txt; 0.5.6 calls it enable_torque_mode_vel_limit). Saved: True. Keep true: in torque mode the ODrive reduces torque above vel_limit." }
+enable_overspeed_error        = { value = true, status = "TBD", how_to_measure = "Saved: True (with vel_limit_tolerance 1.2). Keep true: the ODrive itself errors above 1.2 x vel_limit." }
 dc_bus_overvoltage_trip_level  = { value = 30.0, status = "TBD", how_to_measure = "Volts. Supply is 24 V; regenerated energy pumps the bus up. 30 V trips well below the 56 V factory value." }
 dc_bus_undervoltage_trip_level = { value = 18.0, status = "TBD", how_to_measure = "Volts. Below this the ODrive disarms." }
 dc_max_positive_current      = { value = 6.0, status = "TBD", how_to_measure = "Amps drawn from the supply (motoring)." }
-dc_max_negative_current      = { value = -0.01, status = "TBD", how_to_measure = "Amps pushed back into the supply (regen). Negative. Kept at the 0.5.x default (-0.01 A): a lab supply cannot sink current, so any regen trips DC_BUS_OVER_REGEN_CURRENT and disarms. Raise in magnitude only with a brake resistor fitted (check odrv0.config.enable_brake_resistor / brake_resistance)." }
+dc_max_negative_current      = { value = -3.0, status = "TBD", how_to_measure = "Saved value in docs/odrive_dump.txt: -3.0 A (NOT the -0.01 A factory default assumed earlier). Negative DC-bus current allowed before DC_BUS_OVER_REGEN_CURRENT. This build has a 2 ohm brake resistor armed automatically (brake_resistor_armed True) and max_regen_current 0.0, so regen should go to the resistor, not the PSU. Choosing a value is a human bring-up decision (docs/DECISIONS.md)." }
+brake_resistance             = { value = 2.0, status = "TBD", how_to_measure = "Saved: 2.0 ohm. CHECK ONLY (never written by odrive_setup.py). Confirm the resistor fitted on the board, its value and power rating." }
+max_regen_current            = { value = 0.0, status = "TBD", how_to_measure = "Saved: 0.0 A (current that may flow back into the PSU; 0 = all regen to the brake resistor). CHECK ONLY (never written)." }
 watchdog_timeout             = { value = 0.25, status = "TBD", how_to_measure = "Seconds. The FFB build feeds 'u 0' every 5 ms while running. The precheck requires enable_watchdog = True and a timeout inside [ffb.watchdog_timeout_min_s, ffb.watchdog_timeout_max_s]." }
 enable_watchdog              = { value = true, status = "TBD", how_to_measure = "Required by the FFB precheck. Check on the bench whether your 0.5.x build also checks the watchdog while IDLE (docs/HARDWARE_BRINGUP.md step F3)." }
-torque_constant              = { value = 0.04, status = "TBD", how_to_measure = "Nm/A (currently saved: 0.04). Firmware READS it and converts amps -> torque units. Set 1.0 to make torque units equal amps, or 8.27/KV for real Nm (hoverboard KV is about 16)." }
+torque_constant              = { value = 0.04, status = "TBD", how_to_measure = "Nm/A (saved: 0.04, docs/odrive_dump.txt). Firmware READS it and converts amps -> torque units. Set 1.0 to make torque units equal amps, or 8.27/KV for real Nm (hoverboard KV is about 16)." }
 encoder_mode                 = { value = 0, status = "TBD", how_to_measure = "ENCODER_MODE_INCREMENTAL = 0." }
 
 # -----------------------------------------------------------------------------
@@ -72,7 +75,7 @@ centre_mode      = { value = "power_up", status = "assumed", how_to_measure = "p
 
 # -----------------------------------------------------------------------------
 [uart]
-baud = { value = 115200, status = "TBD", how_to_measure = "Must equal the ODrive UART baud rate (odrv0.config.uart_a_baudrate or similar). 115200 limits the FFB command rate to about 200 Hz; 921600 would allow 1 kHz (future)." }
+baud = { value = 115200, status = "measured", how_to_measure = "docs/odrive_dump.txt: config.enable_uart = True, config.uart_baudrate = 115200. 115200 limits the FFB command rate to about 200 Hz; 921600 would allow 1 kHz (future)." }
 
 # -----------------------------------------------------------------------------
 [mcp23017]

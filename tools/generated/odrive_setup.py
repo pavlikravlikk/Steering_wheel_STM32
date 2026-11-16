@@ -3,7 +3,9 @@
 
 Apply the GENTLE ODrive profile.
 
-    python3 tools/generated/odrive_setup.py            # DRY RUN: print the odrivetool commands
+    python3 tools/generated/odrive_setup.py            # DRY RUN: old -> new against docs/odrive_dump.txt
+                                                       #   + the odrivetool commands; connects to nothing
+    python3 tools/generated/odrive_setup.py --dump F   # DRY RUN against another saved dump
     python3 tools/generated/odrive_setup.py --read     # connect, show old -> new, write nothing
     python3 tools/generated/odrive_setup.py --apply    # connect, check IDLE + vbus, write, verify
     python3 tools/generated/odrive_setup.py --apply --save   # ... and save_configuration()
@@ -12,6 +14,7 @@ Never requests any motion or state change. Never saves unless --save is given.
 Paths that do not exist on this firmware build are skipped with a warning.
 """
 import argparse
+import os
 import sys
 
 SETTINGS = [
@@ -25,7 +28,8 @@ SETTINGS = [
     ('axis0.encoder.config.cpr', 2400),
     ('axis0.encoder.config.use_index', False),
     ('axis0.controller.config.vel_limit', 2.0),
-    ('axis0.controller.config.enable_torque_mode_vel_limit', True),
+    ('axis0.controller.config.enable_current_mode_vel_limit', True),
+    ('axis0.controller.config.enable_overspeed_error', True),
     ('axis0.controller.config.control_mode', 1),
     ('axis0.controller.config.input_mode', 1),
     ('axis0.config.watchdog_timeout', 0.25),
@@ -33,8 +37,10 @@ SETTINGS = [
     ('config.dc_bus_overvoltage_trip_level', 30.0),
     ('config.dc_bus_undervoltage_trip_level', 18.0),
     ('config.dc_max_positive_current', 6.0),
-    ('config.dc_max_negative_current', -0.01),
+    ('config.dc_max_negative_current', -3.0),
 ]
+DEFAULT_DUMP = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "docs",
+                                             "odrive_dump.txt"))
 
 ERROR_TABLES = {'error': {1: 'CONTROL_ITERATION_MISSED', 2: 'DC_BUS_UNDER_VOLTAGE', 4: 'DC_BUS_OVER_VOLTAGE', 8: 'DC_BUS_OVER_REGEN_CURRENT', 16: 'DC_BUS_OVER_CURRENT', 32: 'BRAKE_DEADTIME_VIOLATION', 64: 'BRAKE_DUTY_CYCLE_NAN', 128: 'INVALID_BRAKE_RESISTANCE'}, 'axis0.error': {1: 'INVALID_STATE', 64: 'MOTOR_FAILED', 128: 'SENSORLESS_ESTIMATOR_FAILED', 256: 'ENCODER_FAILED', 512: 'CONTROLLER_FAILED', 2048: 'WATCHDOG_TIMER_EXPIRED', 4096: 'MIN_ENDSTOP_PRESSED', 8192: 'MAX_ENDSTOP_PRESSED', 16384: 'ESTOP_REQUESTED', 131072: 'HOMING_WITHOUT_ENDSTOP', 262144: 'OVER_TEMP', 524288: 'UNKNOWN_POSITION'}, 'axis0.motor.error': {1: 'PHASE_RESISTANCE_OUT_OF_RANGE', 2: 'PHASE_INDUCTANCE_OUT_OF_RANGE', 8: 'DRV_FAULT', 16: 'CONTROL_DEADLINE_MISSED', 128: 'MODULATION_MAGNITUDE', 1024: 'CURRENT_SENSE_SATURATION', 4096: 'CURRENT_LIMIT_VIOLATION', 65536: 'MODULATION_IS_NAN', 131072: 'MOTOR_THERMISTOR_OVER_TEMP', 262144: 'FET_THERMISTOR_OVER_TEMP', 524288: 'TIMER_UPDATE_MISSED', 1048576: 'CURRENT_MEASUREMENT_UNAVAILABLE', 2097152: 'CONTROLLER_FAILED', 4194304: 'I_BUS_OUT_OF_RANGE', 8388608: 'BRAKE_RESISTOR_DISARMED', 16777216: 'SYSTEM_LEVEL', 33554432: 'BAD_TIMING', 67108864: 'UNKNOWN_PHASE_ESTIMATE', 134217728: 'UNKNOWN_PHASE_VEL', 268435456: 'UNKNOWN_TORQUE', 536870912: 'UNKNOWN_CURRENT_COMMAND', 1073741824: 'UNKNOWN_CURRENT_MEASUREMENT', 2147483648: 'UNKNOWN_VBUS_VOLTAGE', 4294967296: 'UNKNOWN_VOLTAGE_COMMAND', 8589934592: 'UNKNOWN_GAINS', 17179869184: 'CONTROLLER_INITIALIZING', 34359738368: 'UNBALANCED_PHASES'}, 'axis0.encoder.error': {1: 'UNSTABLE_GAIN', 2: 'CPR_POLEPAIRS_MISMATCH', 4: 'NO_RESPONSE', 8: 'UNSUPPORTED_ENCODER_MODE', 16: 'ILLEGAL_HALL_STATE', 32: 'INDEX_NOT_FOUND_YET', 64: 'ABS_SPI_TIMEOUT', 128: 'ABS_SPI_COM_FAIL', 256: 'ABS_SPI_NOT_READY', 512: 'HALL_NOT_CALIBRATED_YET'}, 'axis0.controller.error': {1: 'OVERSPEED', 2: 'INVALID_INPUT_MODE', 4: 'UNSTABLE_GAIN', 8: 'INVALID_MIRROR_AXIS', 16: 'INVALID_LOAD_ENCODER', 32: 'INVALID_ESTIMATE', 64: 'INVALID_CIRCULAR_RANGE', 128: 'SPINOUT_DETECTED'}}
 AXIS = 0
@@ -105,9 +111,145 @@ def check_safe_to_touch(odrv):
         problems.append("vbus_voltage = %.2f V outside [%.1f, %.1f] V" % (vbus, VBUS_MIN, VBUS_MAX))
     return problems
 
+# ---- dump parser (copied from tools/odrive_dump.py by the generator) ----
+import re
+
+_TYPE_SUFFIX = re.compile(r"\s*\(\s*[A-Za-z_][A-Za-z0-9_]*\s*\)\s*$")
+_IN_LINE = re.compile(r"^In \[\d+\]:\s*(.*)$")
+_OUT_LINE = re.compile(r"^Out\[\d+\]:\s*(.*)$")
+_NAME = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)*$")
+
+
+def parse_value(text):
+    """'12.0 (float)' -> 12.0, 'True (bool)' -> True, '0x10' -> 16, 'inf' -> inf."""
+    t = _TYPE_SUFFIX.sub("", text.strip())
+    if t in ("True", "true"):
+        return True
+    if t in ("False", "false"):
+        return False
+    if t == "None":
+        return None
+    try:
+        if t.lower().startswith(("0x", "-0x")):
+            return int(t, 16)
+        if re.fullmatch(r"[+-]?\d+", t):
+            return int(t)
+        return float(t)                     # also 'inf', '-inf', 'nan'
+    except ValueError:
+        return t
+
+
+def _prefix_from_expression(expr):
+    expr = expr.strip()
+    if expr == "odrv0":
+        return ""
+    if expr.startswith("odrv0."):
+        rest = expr[len("odrv0."):]
+        return rest if _NAME.match(rest) else None
+    return None                             # not an odrv0 expression: ignore block
+
+
+def parse_dump_report(text, prefix=""):
+    """Return (values, problems). problems = list of (line_number, line, reason)."""
+    values = {}
+    problems = []
+    stack = []                              # (indent, name)
+    block_prefix = prefix
+    skipping = False                        # inside an Out block we cannot place
+    for no, raw in enumerate(text.splitlines(), 1):
+        line = raw.rstrip("\r\n").rstrip()
+        if not line.strip() or line.lstrip().startswith("#"):
+            continue
+        m = _IN_LINE.match(line.strip())
+        if m:
+            p = _prefix_from_expression(m.group(1)) if m.group(1).strip() else None
+            stack = []
+            if m.group(1).strip() == "":
+                skipping = True             # trailing "In [12]:" prompt
+            elif p is None:
+                skipping = True
+                problems.append((no, line, "unsupported expression, block ignored"))
+            else:
+                block_prefix = p
+                skipping = False
+            continue
+        if _OUT_LINE.match(line.strip()):
+            continue
+        if skipping:
+            continue
+        indent = len(line) - len(line.lstrip(" "))
+        body = line.strip()
+        while stack and stack[-1][0] >= indent:
+            stack.pop()
+        # method signatures: "name(obj: object_ref, ...)" [-> result]
+        head = re.split(r"[:=]", body, maxsplit=1)[0]
+        if "(" in head:
+            continue
+        if "=" in body and (":" not in body or body.index("=") < body.index(":")):
+            name, _, value = body.partition("=")
+        elif body.endswith(":"):
+            stack.append((indent, body[:-1].strip()))
+            continue
+        elif ":" in body:
+            name, _, value = body.partition(":")
+        else:
+            problems.append((no, line, "no ':' or '='"))
+            continue
+        name = name.strip()
+        value = value.strip()
+        if not _NAME.match(name):
+            problems.append((no, line, "invalid name"))
+            continue
+        if value == "...":
+            continue                        # sub-object not expanded here
+        rel = [s[1] for s in stack] + [name]
+        absolute = rel[0].startswith("odrv0")
+        parts = ([block_prefix] if (block_prefix and not absolute) else []) + rel
+        path = ".".join(p for p in parts if p)
+        if path.startswith("odrv0."):
+            path = path[len("odrv0."):]
+        parsed = parse_value(value)
+        if isinstance(parsed, str) and ("(" in value or ")" in value or value == ""):
+            problems.append((no, line, "malformed value"))
+            continue
+        values[path] = parsed
+    return values, problems
+
+
+def parse_dump(text, prefix=""):
+    return parse_dump_report(text, prefix)[0]
+# -------------------------------------------------------------------------
 
 def plan_lines():
     return ["odrv0.%s = %r" % (path, value) for path, value in SETTINGS]
+
+
+def _same(old, new):
+    if isinstance(new, bool) or isinstance(old, bool):
+        return bool(old) == bool(new) and isinstance(old, (bool, int))
+    if isinstance(new, float):
+        try:
+            return abs(float(old) - new) <= 1e-4 * max(1.0, abs(new))
+        except (TypeError, ValueError):
+            return False
+    return old == new
+
+
+def dry_run_diff(dump_values, out=print):
+    """Old (saved, from the dump) -> new (profile). Returns the number of changes."""
+    changes = 0
+    out("# %-58s %-22s %s" % ("parameter", "dump (saved)", "profile (new)"))
+    for path, new in SETTINGS:
+        if path not in dump_values:
+            out("  %-58s %-22s %r   <-- NOT IN DUMP: would be skipped" % (path, "-", new))
+            continue
+        old = dump_values[path]
+        if _same(old, new):
+            out("  %-58s %-22r %r" % (path, old, new))
+        else:
+            changes += 1
+            out("  %-58s %-22r %r   <-- change" % (path, old, new))
+    return changes
 
 
 def apply(odrv, write=False, save=False, out=print):
@@ -127,9 +269,9 @@ def apply(odrv, write=False, save=False, out=print):
             out("  SKIP %-55s (not present on this firmware)" % path)
             continue
         old = read(odrv, path)
-        mark = "" if old == new else "   <-- change"
+        mark = "" if _same(old, new) else "   <-- change"
         out("  %-55s %r -> %r%s" % (path, old, new, mark))
-        if write and old != new:
+        if write and not _same(old, new):
             parent, name = resolve(odrv, path)
             setattr(parent, name, new)
             back = getattr(parent, name)
@@ -153,13 +295,27 @@ def main(argv=None):
     ap.add_argument("--read", action="store_true", help="connect and compare, write nothing")
     ap.add_argument("--apply", action="store_true", help="write the values (RAM only)")
     ap.add_argument("--save", action="store_true", help="with --apply: also save_configuration()")
+    ap.add_argument("--dump", default=DEFAULT_DUMP, help="dry run: saved dump to diff against")
     a = ap.parse_args(argv)
     if a.save and not a.apply:
         ap.error("--save needs --apply")
     if not (a.read or a.apply):
-        print("# DRY RUN - nothing is sent. Commands for odrivetool:")
-        for line in plan_lines():
-            print(line)
+        print("# DRY RUN - nothing is sent, nothing is connected.")
+        changed = SETTINGS
+        if a.dump and os.path.exists(a.dump):
+            with open(a.dump, "r", encoding="utf-8", errors="replace") as fh:
+                dump_values, problems = parse_dump_report(fh.read())
+            print("# Old values: %s (saved state when the dump was made; re-check live with --read)" % a.dump)
+            for no, line, why in problems:
+                print("# PARSE WARN line %d: %s [%s]" % (no, line.strip()[:70], why))
+            n = dry_run_diff(dump_values)
+            print("# %d change(s)." % n)
+            changed = [(p, v) for p, v in SETTINGS if p in dump_values and not _same(dump_values[p], v)]
+        else:
+            print("# (no dump found: listing every setting)")
+        print("# Commands for odrivetool (only the changes):")
+        for path, value in changed:
+            print("odrv0.%s = %r" % (path, value))
         print("# (then, only if you want it permanent: odrv0.save_configuration())")
         return 0
     odrv = connect()

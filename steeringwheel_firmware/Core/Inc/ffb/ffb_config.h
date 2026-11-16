@@ -49,10 +49,9 @@
 #define FFB_FEED_WATCHDOG_WHEN_DISARMED 0
 #endif
 
-/* 1 = during ARMING, read axis0.current_state and require 8
- * (CLOSED_LOOP_CONTROL) before RUNNING; also monitored while RUNNING.
- * TODO(TBD): confirm the property exists in docs/odrive_dump.txt. If it does
- * not, arming fails safely (ARMING_TIMEOUT) - then set 0. */
+/* 1 = read axis0.current_state (exists in docs/odrive_dump.txt, int32):
+ * the precheck requires 1 (IDLE), ARMING requires 8 (CLOSED_LOOP_CONTROL)
+ * before RUNNING, and RUNNING monitors it. */
 #ifndef FFB_VERIFY_CLOSED_LOOP
 #define FFB_VERIFY_CLOSED_LOOP          1
 #endif

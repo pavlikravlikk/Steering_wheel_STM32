@@ -12,111 +12,65 @@ the startup flags, compares the live configuration with the profile (every
 difference is listed), and evaluates the same pre-arm conditions the FFB
 firmware checks. It never writes anything: only attribute reads.
 
-Dump formats accepted by --fixture:
-  * flat:  "axis0.motor.config.current_lim = 12.0"  (optionally prefixed "odrv0.")
-  * tree:  what odrivetool prints for ``odrv0`` or ``odrv0.axis0`` (indented
-           "name = value (type)" lines, "name:" opens a sub-object). Use
-           --prefix axis0 for a tree printed from odrv0.axis0.
+Dump formats accepted by --fixture (see tools/odrive_dump.py):
+  * the odrivetool/IPython session format of docs/odrive_dump.txt
+    ("In [n]: odrv0.axis0" blocks, "name: value (type)" lines);
+  * flat:  "axis0.motor.config.current_lim = 12.0"  (optionally prefixed "odrv0.");
+  * older trees with "name = value (type)"; --prefix axis0 for a tree printed
+    from odrv0.axis0 without an "In [n]:" line.
 Exit code: 0 = all good, 1 = problems/differences found, 2 = could not read.
 """
 import argparse
 import os
-import re
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import odrive_enums  # noqa: E402
 import gen_config    # noqa: E402
+from odrive_dump import parse_dump, parse_dump_report, parse_value  # noqa: E402,F401
+
+DEFAULT_DUMP = os.path.join(os.path.dirname(HERE), "docs", "odrive_dump.txt")
 
 # Paths read in live mode (relative to odrv0); axis0 is replaced by the profile axis.
+# All of them exist in docs/odrive_dump.txt (checked by tools/tests/test_odrive_status.py).
 READ_PATHS = [
-    "vbus_voltage", "error", "fw_version_major", "fw_version_minor", "fw_version_revision",
+    "vbus_voltage", "fw_version_major", "fw_version_minor", "fw_version_revision",
+    "fw_version_unreleased", "hw_version_major", "hw_version_minor", "hw_version_variant",
+    "brake_resistor_armed", "brake_resistor_saturated", "ibus",
     "axis0.error", "axis0.motor.error", "axis0.encoder.error", "axis0.controller.error",
     "axis0.current_state", "axis0.motor.is_calibrated", "axis0.encoder.is_ready",
     "axis0.encoder.pos_estimate", "axis0.encoder.shadow_count", "axis0.encoder.vel_estimate",
+    "axis0.encoder.hall_state", "axis0.encoder.config.offset",
     "axis0.motor.config.phase_resistance", "axis0.motor.config.phase_inductance",
-    "axis0.motor.config.pre_calibrated", "axis0.encoder.config.pre_calibrated",
+    "axis0.motor.config.pre_calibrated", "axis0.motor.config.direction",
+    "axis0.encoder.config.pre_calibrated", "axis0.motor.effective_current_lim",
     "axis0.config.startup_motor_calibration", "axis0.config.startup_encoder_index_search",
     "axis0.config.startup_encoder_offset_calibration", "axis0.config.startup_closed_loop_control",
-    "axis0.config.startup_homing",
-    "axis0.controller.config.pos_gain", "axis0.motor.config.torque_lim",
-    "config.enable_uart_a", "config.uart_a_baudrate", "config.enable_uart", "config.uart_baudrate",
-    "config.uart0_protocol", "config.enable_brake_resistor", "config.brake_resistance",
+    "axis0.config.startup_homing", "axis0.config.startup_sensorless_control",
+    "axis0.controller.config.pos_gain", "axis0.controller.config.vel_gain",
+    "axis0.controller.config.vel_integrator_gain", "axis0.motor.config.torque_lim",
+    "axis0.controller.config.enable_vel_limit", "axis0.controller.config.vel_limit_tolerance",
+    "config.enable_uart", "config.uart_baudrate", "config.enable_ascii_protocol_on_usb",
 ]
+# Present in other 0.5.x builds only; read if they exist (live mode skips missing ones).
+OPTIONAL_PATHS = ["error", "config.enable_brake_resistor", "config.enable_uart_a", "config.uart_a_baudrate"]
 
 MANUAL = """\
-Without the 'odrive' Python package, make a dump by hand:
+Without the 'odrive' Python package, make a dump by hand (READ only):
   1. odrivetool                       (on the PC connected to the ODrive's USB port)
-  2. In odrivetool type, one after the other, and copy the output into a text file:
-       odrv0.vbus_voltage
-       odrv0.axis0
+  2. Type these, one after the other, and copy the whole session text into a file:
+       odrv0
        odrv0.config
-  3. Prefix the axis0 block with "axis0:" and the config block with "config:",
-     indenting each block by two spaces, or simply save the three outputs into
-     separate files and run:
-       python3 tools/odrive_status.py --fixture axis0.txt --prefix axis0
-Only READ in odrivetool - do not assign anything while making the dump.
+       odrv0.axis0
+       odrv0.axis0.controller.config
+       odrv0.axis0.motor.config
+       odrv0.axis0.encoder.config
+  3. python3 tools/odrive_status.py --fixture <file>
+     (the "In [n]: odrv0.xxx" lines tell the parser where each block belongs;
+      docs/odrive_dump.txt is an example made exactly this way.)
+Do not assign anything while making the dump.
 """
-
-
-# ----------------------------------------------------------------------------
-# Dump parsing
-# ----------------------------------------------------------------------------
-_TYPE_SUFFIX = re.compile(r"\s*\((?:int|float|bool|str|string|object|function|uint\d+|int\d+)\)\s*$")
-
-
-def parse_value(text):
-    t = _TYPE_SUFFIX.sub("", text.strip())
-    if t in ("True", "true"):
-        return True
-    if t in ("False", "false"):
-        return False
-    try:
-        if t.lower().startswith(("0x", "-0x")):
-            return int(t, 16)
-        if re.fullmatch(r"[+-]?\d+", t):
-            return int(t)
-        return float(t)
-    except ValueError:
-        return t
-
-
-def parse_dump(text, prefix=""):
-    """Return {path: value} with paths relative to odrv0 (e.g. 'axis0.error')."""
-    values = {}
-    stack = []  # (indent, name)
-    for raw in text.splitlines():
-        line = raw.rstrip()
-        if not line.strip() or line.lstrip().startswith("#"):
-            continue
-        indent = len(line) - len(line.lstrip(" "))
-        body = line.strip()
-        if body.startswith("In [") or body.startswith("Out["):
-            body = body.split(":", 1)[1].strip() if ":" in body else ""
-            if not body:
-                continue
-        while stack and stack[-1][0] >= indent:
-            stack.pop()
-        if "=" in body:
-            name, _, value = body.partition("=")
-            name = name.strip()
-        elif body.endswith(":"):
-            stack.append((indent, body[:-1].strip()))
-            continue
-        elif ":" in body:
-            name, _, value = body.partition(":")
-            name = name.strip()
-        else:
-            continue
-        rel = [s[1] for s in stack] + [name]
-        absolute = rel[0].startswith("odrv0")      # "odrv0.x = .." ignores --prefix
-        parts = [p for p in ([prefix] if (prefix and not absolute) else []) + rel if p]
-        path = ".".join(parts)
-        if path.startswith("odrv0."):
-            path = path[len("odrv0."):]
-        values[path] = parse_value(value)
-    return values
 
 
 # ----------------------------------------------------------------------------
@@ -140,7 +94,7 @@ def read_live(odrv, paths):
 def live_paths(axis):
     settings = [p for p, _ in gen_config.setup_settings(PROFILE_CACHE[0])] if PROFILE_CACHE else []
     paths = []
-    for p in READ_PATHS + settings:
+    for p in READ_PATHS + OPTIONAL_PATHS + settings:
         p = p.replace("axis0", "axis%d" % axis)
         if p not in paths:
             paths.append(p)
@@ -182,8 +136,25 @@ def analyse(values, profile):
 
     # -- firmware
     if "fw_version_major" in values:
-        add("INFO", "firmware %s.%s.%s" % (values.get("fw_version_major"), values.get("fw_version_minor"),
-                                           values.get("fw_version_revision")))
+        add("INFO", "firmware %s.%s.%s%s, hardware %s.%s variant %s" % (
+            values.get("fw_version_major"), values.get("fw_version_minor"), values.get("fw_version_revision"),
+            " (unreleased dev build)" if values.get("fw_version_unreleased") else "",
+            values.get("hw_version_major"), values.get("hw_version_minor"), values.get("hw_version_variant")))
+    add("INFO", "API generation (from the property names): %s" % odrive_enums.firmware_family(values))
+    cm, im = get("axis0.controller.config.control_mode"), get("axis0.controller.config.input_mode")
+    if cm is not None or im is not None:
+        add("INFO", "control_mode = %r (%s), input_mode = %r (%s)" % (
+            cm, odrive_enums.CONTROL_MODES.get(cm, "?"), im, odrive_enums.INPUT_MODES.get(im, "?")))
+    if "config.enable_uart" in values:
+        add("INFO", "UART enabled = %r, baud = %r (profile uart.baud = %r)" % (
+            values.get("config.enable_uart"), values.get("config.uart_baudrate"),
+            gen_config.val(profile, "uart", "baud")))
+        if values.get("config.uart_baudrate") not in (None, gen_config.val(profile, "uart", "baud")):
+            add("ERROR", "UART baud differs from the profile: the STM32 will not understand the ODrive")
+    if "brake_resistor_armed" in values or "config.brake_resistance" in values:
+        add("INFO", "brake resistor armed = %r, brake_resistance = %r ohm, max_regen_current = %r A" % (
+            values.get("brake_resistor_armed"), values.get("config.brake_resistance"),
+            values.get("config.max_regen_current")))
     # -- errors
     lines.append(("HEAD", "Error registers"))
     for reg in ("error", "axis0.error", "axis0.motor.error", "axis0.encoder.error", "axis0.controller.error"):
@@ -220,7 +191,9 @@ def analyse(values, profile):
         ok = vmin <= float(vbus) <= vmax
         add("OK" if ok else "WARN", "vbus_voltage = %.2f V (window %.1f..%.1f V)" % (float(vbus), vmin, vmax))
     for path in ("axis0.encoder.shadow_count", "axis0.encoder.pos_estimate", "axis0.encoder.vel_estimate",
-                 "axis0.motor.is_calibrated", "axis0.encoder.is_ready", "axis0.motor.config.phase_resistance"):
+                 "axis0.motor.is_calibrated", "axis0.encoder.is_ready", "axis0.motor.config.phase_resistance",
+                 "axis0.motor.config.pre_calibrated", "axis0.encoder.config.pre_calibrated",
+                 "axis0.motor.config.direction", "axis0.encoder.hall_state"):
         v = get(path)
         if v is not None:
             add("INFO", "%s = %r" % (path.replace("axis0", A), v))
@@ -228,25 +201,31 @@ def analyse(values, profile):
     # -- startup flags
     lines.append(("HEAD", "Startup flags (must all be False)"))
     for flag in ("startup_motor_calibration", "startup_encoder_index_search",
-                 "startup_encoder_offset_calibration", "startup_closed_loop_control", "startup_homing"):
+                 "startup_encoder_offset_calibration", "startup_closed_loop_control", "startup_homing",
+                 "startup_sensorless_control"):
         v = get("axis0.config." + flag)
         if v is None:
             continue
         add("OK" if v is False else "ERROR", "%s.config.%s = %r" % (A, flag, v))
+        if v is True and flag == "startup_closed_loop_control":
+            add("HINT", "  the ODrive engages CLOSED LOOP by itself at every power-up (with the saved "
+                        "control mode and gains). Set it False in odrivetool and save before anything else.")
 
     # -- profile comparison
     lines.append(("HEAD", "Configuration vs config/hardware_profile.toml"))
     ndiff = 0
-    for path, want in gen_config.setup_settings(profile):
+    entries = [(p, v, "") for p, v in gen_config.setup_settings(profile)]
+    entries += [(p, v, " [check only, never written]") for p, v in gen_config.check_only_settings(profile)]
+    for path, want, note in entries:
         have = values.get(path)
         if have is None:
-            add("INFO", "%-55s not in dump (profile: %r)" % (path, want))
+            add("WARN", "%-55s NOT PRESENT in this firmware/dump (profile: %r)%s" % (path, want, note))
             continue
         if _close(have, want):
-            add("OK", "%-55s %r" % (path, have))
+            add("OK", "%-55s %r%s" % (path, have, note))
         else:
             ndiff += 1
-            add("DIFF", "%-55s live %r, profile %r" % (path, have, want))
+            add("DIFF", "%-55s live %r, profile %r%s" % (path, have, want, note))
     if ndiff:
         add("HINT", "%d difference(s): python3 tools/generated/odrive_setup.py --read shows the same; "
                     "--apply writes the profile (a human decides)" % ndiff)
@@ -300,6 +279,8 @@ def precheck(values, profile):
     for reg in ("axis0.error", "axis0.motor.error", "axis0.encoder.error"):
         v = g(reg)
         chk(v == 0, "%s == 0 (live %r)" % (reg.replace("axis0", A), v))
+    st = g("axis0.current_state")
+    chk(st == odrive_enums.AXIS_STATE_IDLE, "current_state == 1 IDLE before arming (live %r)" % (st,))
     vb = num("vbus_voltage")
     chk(vb is not None and f("vbus_min_v") <= vb <= f("vbus_max_v"),
         "vbus_voltage in [%.1f, %.1f] V (live %r)" % (f("vbus_min_v"), f("vbus_max_v"), vb))
@@ -330,9 +311,15 @@ def main(argv=None):
     ap.add_argument("--dump-out", help="live mode: save the values read as a flat dump")
     a = ap.parse_args(argv)
 
-    if a.manual or not (a.fixture or a.live):
+    if a.manual:
         print(MANUAL)
-        return 0 if a.manual else 2
+        return 0
+    if not (a.fixture or a.live):
+        if os.path.exists(DEFAULT_DUMP):
+            a.fixture = [DEFAULT_DUMP]          # the committed real dump
+        else:
+            print(MANUAL)
+            return 2
     try:
         profile = gen_config.load_profile(a.profile)
     except (gen_config.ProfileError, OSError) as e:
@@ -342,10 +329,22 @@ def main(argv=None):
 
     if a.fixture:
         values = {}
+        problems = []
         for path in a.fixture:
-            with open(path, "r", encoding="utf-8") as fh:
-                values.update(parse_dump(fh.read(), a.prefix))
+            try:
+                with open(path, "r", encoding="utf-8", errors="replace") as fh:
+                    v, p = parse_dump_report(fh.read(), a.prefix)
+            except OSError as e:
+                print("cannot read %s: %s" % (path, e))
+                return 2
+            values.update(v)
+            problems += [(path,) + x for x in p]
         print("Source: %s (%d values)" % (", ".join(a.fixture), len(values)))
+        for path, no, line, why in problems:
+            print("PARSE WARN %s:%d: %s  [%s]" % (path, no, line.strip()[:80], why))
+        if not values:
+            print("No values could be read from the dump.")
+            return 2
     else:
         try:
             import odrive  # optional, official package

@@ -22,11 +22,13 @@ static const char *const k_paths[FFB_PC_COUNT] = {
   "axis0.motor.error",
   "axis0.encoder.error",
   "vbus_voltage",
-  "axis0.current_state",       /* TODO(TBD): confirm in docs/odrive_dump.txt */
+  "axis0.current_state",       /* present in docs/odrive_dump.txt (int32)   */
 };
+/* Every path above exists in docs/odrive_dump.txt (tests/test_ffb_dump.c). */
 
 #define CONTROL_MODE_TORQUE   1.0f   /* ODrive ControlMode.TORQUE_CONTROL      */
 #define AXIS_STATE_CLOSED_LOOP 8.0f  /* ODrive AxisState.CLOSED_LOOP_CONTROL   */
+#define AXIS_STATE_IDLE        1.0f  /* ODrive AxisState.IDLE                  */
 
 static const ffb_pc_item_t k_monitor[] = {
   FFB_PC_AXIS_ERROR, FFB_PC_MOTOR_ERROR, FFB_PC_ENCODER_ERROR, FFB_PC_VBUS, FFB_PC_CURRENT_STATE,
@@ -188,9 +190,9 @@ ffb_reason_t ffb_precheck_evaluate(const ffb_pc_table_t *t, const ffb_limits_t *
   }
   for (unsigned i = 0U; i < (unsigned)FFB_PC_COUNT; i++)
   {
-    if (!in_use(t, i) || (i == (unsigned)FFB_PC_CURRENT_STATE))
+    if (!in_use(t, i))
     {
-      continue;        /* current_state is checked while ARMING, not here */
+      continue;
     }
     if (t->v[i].failed)
     {
@@ -214,6 +216,8 @@ ffb_reason_t ffb_precheck_evaluate(const ffb_pc_table_t *t, const ffb_limits_t *
   if (!is_zero(V(FFB_PC_AXIS_ERROR)))                              return FFB_REASON_AXIS_ERROR;
   if (!is_zero(V(FFB_PC_MOTOR_ERROR)))                             return FFB_REASON_MOTOR_ERROR;
   if (!is_zero(V(FFB_PC_ENCODER_ERROR)))                           return FFB_REASON_ENCODER_ERROR;
+  if (t->use_current_state && (V(FFB_PC_CURRENT_STATE) != AXIS_STATE_IDLE))
+                                                                   return FFB_REASON_NOT_IDLE;
   if (!within(V(FFB_PC_VBUS), lim->vbus_min, lim->vbus_max))       return FFB_REASON_VBUS_RANGE;
 #undef V
   return FFB_REASON_OK;

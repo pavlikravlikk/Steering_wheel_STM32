@@ -24,6 +24,7 @@ MUTATIONS=(
   "$SRC/ffb/ffb_safety.c|stop_now(out);\n}\n\nstatic void to_disarmed|(void)out;\n}\n\nstatic void to_disarmed|fault does not stop the motor"
   "$SRC/ffb/ffb_precheck.c|return FFB_REASON_CURRENT_LIM_HIGH;|return FFB_REASON_OK;|current_lim not checked"
   "$SRC/ffb/ffb_precheck.c|return FFB_REASON_WATCHDOG_DISABLED;|return FFB_REASON_OK;|watchdog not required"
+  "$SRC/ffb/ffb_precheck.c|return FFB_REASON_NOT_IDLE;|return FFB_REASON_OK;|arming allowed when axis not IDLE"
   "$SRC/ffb/ffb_precheck.c|ctx->require_measured \&\& (ctx->profile_safety_tbd > 0U)|0|TBD profile accepted"
   "$SRC/ffb/ffb_cmd.c|(state != STATE_IDLE) \&\& (state != STATE_CLOSED_LOOP)|0|any requested_state allowed"
   "$SRC/ffb/ffb_cmd.c|return ((float)scaled / 10000.0f) <= (FFB_TORQUE_CMD_ABS_MAX + 0.00005f);|return true;|torque magnitude not limited in allowlist"
