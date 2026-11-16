@@ -1,0 +1,335 @@
+
+In [6]: odrv0
+Out[6]: 
+axis0:
+  clear_errors(obj: object_ref)
+  config: ...
+  controller: ...
+  current_state: 1 (int32)
+  encoder: ...
+  error: 256 (int32)
+  fet_thermistor: ...
+  is_homed: False (bool)
+  lockin_state: 0 (int32)
+  loop_counter: 30320578 (uint32)
+  max_endstop: ...
+  min_endstop: ...
+  motor: ...
+  motor_thermistor: ...
+  requested_state: 0 (int32)
+  sensorless_estimator: ...
+  step_dir_active: False (bool)
+  trap_traj: ...
+  watchdog_feed(obj: object_ref)
+axis1:
+  clear_errors(obj: object_ref)
+  config: ...
+  controller: ...
+  current_state: 1 (int32)
+  encoder: ...
+  error: 0 (int32)
+  fet_thermistor: ...
+  is_homed: False (bool)
+  lockin_state: 0 (int32)
+  loop_counter: 30320624 (uint32)
+  max_endstop: ...
+  min_endstop: ...
+  motor: ...
+  motor_thermistor: ...
+  requested_state: 0 (int32)
+  sensorless_estimator: ...
+  step_dir_active: False (bool)
+  trap_traj: ...
+  watchdog_feed(obj: object_ref)
+brake_resistor_armed: True (bool)
+brake_resistor_saturated: False (bool)
+can:
+  config: ...
+  error: 0 (int32)
+  set_baud_rate(obj: object_ref, baudRate: uint32)
+config:
+  brake_resistance: 2.0 (float)
+  dc_bus_overvoltage_ramp_end: 59.92000198364258 (float)
+  dc_bus_overvoltage_ramp_start: 59.92000198364258 (float)
+  dc_bus_overvoltage_trip_level: 56.0 (float)
+  dc_bus_undervoltage_trip_level: 8.0 (float)
+  dc_max_negative_current: -3.0 (float)
+  dc_max_positive_current: 20.0 (float)
+  enable_ascii_protocol_on_usb: True (bool)
+  enable_dc_bus_overvoltage_ramp: False (bool)
+  enable_i2c_instead_of_can: False (bool)
+  enable_uart: True (bool)
+  gpio1_pwm_mapping: ...
+  gpio2_pwm_mapping: ...
+  gpio3_analog_mapping: ...
+  gpio3_pwm_mapping: ...
+  gpio4_analog_mapping: ...
+  gpio4_pwm_mapping: ...
+  max_regen_current: 0.0 (float)
+  uart_baudrate: 115200 (uint32)
+enter_dfu_mode(obj: object_ref)
+erase_configuration(obj: object_ref)
+fw_version_major: 0 (uint8)
+fw_version_minor: 0 (uint8)
+fw_version_revision: 0 (uint8)
+fw_version_unreleased: 1 (uint8)
+get_adc_voltage(obj: object_ref, gpio: uint32) -> voltage: float
+get_oscilloscope_val(obj: object_ref, index: uint32) -> val: float
+hw_version_major: 3 (uint8)
+hw_version_minor: 6 (uint8)
+hw_version_variant: 56 (uint8)
+ibus: 0.0 (float)
+ibus_report_filter_k: 1.0 (float)
+reboot(obj: object_ref)
+save_configuration(obj: object_ref)
+serial_number: 55461792789557 (uint64)
+system_stats:
+  i2c: ...
+  min_heap_space: 41560 (uint32)
+  min_stack_space_axis0: 1628 (uint32)
+  min_stack_space_axis1: 1692 (uint32)
+  min_stack_space_can: 804 (uint32)
+  min_stack_space_comms: 3864 (uint32)
+  min_stack_space_startup: 1700 (uint32)
+  min_stack_space_uart: 2028 (uint32)
+  min_stack_space_usb: 3716 (uint32)
+  min_stack_space_usb_irq: 1796 (uint32)
+  stack_usage_axis0: 420 (uint32)
+  stack_usage_axis1: 356 (uint32)
+  stack_usage_can: 220 (uint32)
+  stack_usage_comms: 232 (uint32)
+  stack_usage_startup: 348 (uint32)
+  stack_usage_uart: 2068 (uint32)
+  stack_usage_usb: 380 (uint32)
+  stack_usage_usb_irq: 252 (uint32)
+  uptime: 3791664 (uint32)
+  usb: ...
+test_function(obj: object_ref, delta: int32) -> cnt: int32
+test_property: 0 (uint32)
+user_config_loaded: True (bool)
+vbus_voltage: 24.18603515625 (float)
+
+In [7]: odrv0.config
+Out[7]: 
+brake_resistance: 2.0 (float)
+dc_bus_overvoltage_ramp_end: 59.92000198364258 (float)
+dc_bus_overvoltage_ramp_start: 59.92000198364258 (float)
+dc_bus_overvoltage_trip_level: 56.0 (float)
+dc_bus_undervoltage_trip_level: 8.0 (float)
+dc_max_negative_current: -3.0 (float)
+dc_max_positive_current: 20.0 (float)
+enable_ascii_protocol_on_usb: True (bool)
+enable_dc_bus_overvoltage_ramp: False (bool)
+enable_i2c_instead_of_can: False (bool)
+enable_uart: True (bool)
+gpio1_pwm_mapping:
+  endpoint: None (object_ref)
+  max: 0.0 (float)
+  min: 0.0 (float)
+gpio2_pwm_mapping:
+  endpoint: None (object_ref)
+  max: 0.0 (float)
+  min: 0.0 (float)
+gpio3_analog_mapping:
+  endpoint: None (object_ref)
+  max: 0.0 (float)
+  min: 0.0 (float)
+gpio3_pwm_mapping:
+  endpoint: None (object_ref)
+  max: 0.0 (float)
+  min: 0.0 (float)
+gpio4_analog_mapping:
+  endpoint: None (object_ref)
+  max: 0.0 (float)
+  min: 0.0 (float)
+gpio4_pwm_mapping:
+  endpoint: None (object_ref)
+  max: 0.0 (float)
+  min: 0.0 (float)
+max_regen_current: 0.0 (float)
+uart_baudrate: 115200 (uint32)
+
+In [8]: odrv0.axis0
+Out[8]: 
+clear_errors(obj: object_ref)
+config:
+  calibration_lockin: ...
+  can_heartbeat_rate_ms: 100 (uint32)
+  can_node_id: 0 (uint32)
+  can_node_id_extended: False (bool)
+  dir_gpio_pin: 2 (uint16)
+  enable_step_dir: False (bool)
+  enable_watchdog: False (bool)
+  general_lockin: ...
+  sensorless_ramp: ...
+  startup_closed_loop_control: True (bool)
+  startup_encoder_index_search: False (bool)
+  startup_encoder_offset_calibration: True (bool)
+  startup_homing: False (bool)
+  startup_motor_calibration: False (bool)
+  startup_sensorless_control: False (bool)
+  step_dir_always_on: False (bool)
+  step_gpio_pin: 1 (uint16)
+  turns_per_step: 0.0009765625 (float)
+  watchdog_timeout: 0.0 (float)
+controller:
+  anticogging_valid: False (bool)
+  config: ...
+  error: 0 (int32)
+  input_pos: 0.0 (float)
+  input_torque: 0.0 (float)
+  input_vel: 0.0 (float)
+  move_incremental(obj: object_ref, displacement: float, from_input_pos: bool)
+  pos_setpoint: 0.0 (float)
+  start_anticogging_calibration(obj: object_ref)
+  torque_setpoint: 0.0 (float)
+  trajectory_done: True (bool)
+  vel_integrator_torque: 0.0 (float)
+  vel_setpoint: 0.0 (float)
+current_state: 1 (int32)
+encoder:
+  calib_scan_response: 0.0 (float)
+  config: ...
+  count_in_cpr: 0 (int32)
+  error: 4 (int32)
+  hall_state: 7 (uint8)
+  index_found: False (bool)
+  interpolation: 0.5 (float)
+  is_ready: False (bool)
+  phase: 0.7122747898101807 (float)
+  pos_abs: 0 (int32)
+  pos_circular: 0.0 (float)
+  pos_cpr: 0.0 (float)
+  pos_cpr_counts: 0.0 (float)
+  pos_estimate: 0.0 (float)
+  pos_estimate_counts: 0.0 (float)
+  set_linear_count(obj: object_ref, count: int32)
+  shadow_count: 0 (int32)
+  spi_error_rate: 0.0 (float)
+  vel_estimate: 0.0 (float)
+  vel_estimate_counts: 0.0 (float)
+error: 256 (int32)
+fet_thermistor:
+  config: ...
+  error: 0 (int32)
+  temperature: 21.322818756103516 (float)
+is_homed: False (bool)
+lockin_state: 0 (int32)
+loop_counter: 30438703 (uint32)
+max_endstop:
+  config: ...
+  endstop_state: False (bool)
+min_endstop:
+  config: ...
+  endstop_state: False (bool)
+motor:
+  DC_calib_phB: -1.44743812084198 (float)
+  DC_calib_phC: -1.386546015739441 (float)
+  armed_state: 0 (int32)
+  config: ...
+  current_control: ...
+  current_meas_phB: -0.022963881492614746 (float)
+  current_meas_phC: -0.08367812633514404 (float)
+  effective_current_lim: 10.0 (float)
+  error: 16 (int32)
+  gate_driver: ...
+  is_calibrated: True (bool)
+  phase_current_rev_gain: 0.012500000186264515 (float)
+  timing_log: ...
+motor_thermistor:
+  config: ...
+  error: 0 (int32)
+  temperature: 0.0 (float)
+requested_state: 0 (int32)
+sensorless_estimator:
+  config: ...
+  error: 0 (int32)
+  phase: -3.135256052017212 (float)
+  pll_pos: -3.139277935028076 (float)
+  vel_estimate: 0.03180212527513504 (float)
+step_dir_active: False (bool)
+trap_traj:
+  config: ...
+watchdog_feed(obj: object_ref)
+
+In [9]: odrv0.axis0.controller.config
+Out[9]: 
+anticogging:
+  anticogging_enabled: True (bool)
+  calib_anticogging: False (bool)
+  calib_pos_threshold: 1.0 (float)
+  calib_vel_threshold: 1.0 (float)
+  cogging_ratio: 1.0 (float)
+  index: 0 (uint32)
+  pre_calibrated: False (bool)
+axis_to_mirror: 255 (uint8)
+circular_setpoint_range: 1.0 (float)
+circular_setpoints: False (bool)
+control_mode: 3 (int32)
+enable_current_mode_vel_limit: True (bool)
+enable_gain_scheduling: False (bool)
+enable_overspeed_error: True (bool)
+enable_vel_limit: True (bool)
+gain_scheduling_width: 10.0 (float)
+homing_speed: 0.25 (float)
+inertia: 0.0 (float)
+input_filter_bandwidth: 2.0 (float)
+input_mode: 5 (int32)
+load_encoder_axis: 0 (uint8)
+mirror_ratio: 1.0 (float)
+pos_gain: 30.0 (float)
+torque_ramp_rate: 0.009999999776482582 (float)
+vel_gain: 0.019999999552965164 (float)
+vel_integrator_gain: 0.20000000298023224 (float)
+vel_limit: 50.0 (float)
+vel_limit_tolerance: 1.2000000476837158 (float)
+vel_ramp_rate: 1.0 (float)
+
+In [10]: odrv0.axis0.motor.config
+Out[10]: 
+acim_autoflux_attack_gain: 10.0 (float)
+acim_autoflux_decay_gain: 1.0 (float)
+acim_autoflux_enable: False (bool)
+acim_autoflux_min_Id: 10.0 (float)
+acim_gain_min_flux: 10.0 (float)
+acim_slip_velocity: 14.706000328063965 (float)
+calibration_current: 5.0 (float)
+current_control_bandwidth: 1000.0 (float)
+current_lim: 12.0 (float)
+current_lim_margin: 8.0 (float)
+direction: -1 (int32)
+inverter_temp_limit_lower: 100.0 (float)
+inverter_temp_limit_upper: 120.0 (float)
+motor_type: 0 (int32)
+phase_inductance: 0.00044445935054682195 (float)
+phase_resistance: 0.166108176112175 (float)
+pole_pairs: 15 (int32)
+pre_calibrated: True (bool)
+requested_current_range: 20.0 (float)
+resistance_calib_max_voltage: 4.0 (float)
+torque_constant: 0.03999999910593033 (float)
+torque_lim: inf (float)
+
+In [11]: odrv0.axis0.encoder.config
+Out[11]: 
+abs_spi_cs_gpio_pin: 1 (uint16)
+bandwidth: 3000.0 (float)
+calib_range: 0.019999999552965164 (float)
+calib_scan_distance: 50.26548385620117 (float)
+calib_scan_omega: 12.566370964050293 (float)
+cpr: 2400 (int32)
+enable_phase_interpolation: True (bool)
+find_idx_on_lockin_only: False (bool)
+idx_search_unidirectional: False (bool)
+ignore_illegal_hall_state: False (bool)
+mode: 0 (int32)
+offset: -9298 (int32)
+offset_float: 0.3634687662124634 (float)
+pre_calibrated: False (bool)
+sincos_gpio_pin_cos: 4 (uint16)
+sincos_gpio_pin_sin: 3 (uint16)
+use_index: False (bool)
+zero_count_on_find_idx: True (bool)
+
+In [12]: 
+
