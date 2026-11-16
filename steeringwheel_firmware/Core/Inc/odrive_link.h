@@ -11,6 +11,7 @@
 #include <stdint.h>
 
 #include "odrive_ascii.h"
+#include "wheel_config.h"
 
 /** Init UART, protocol client and mapping (config from wheel_config.h). */
 void odrive_link_init(void);
@@ -35,5 +36,17 @@ bool odrive_link_position(uint32_t now_ms, float *pos_turns, float *vel_turns_s)
 bool odrive_link_set_centre(uint32_t now_ms);
 
 const odr_stats_t *odrive_link_stats(void);
+
+#if WHEEL_FFB
+/** FFB precheck only: queue a one-shot read-only "r <path>" (sent instead
+ *  of the next "f" request) and collect its result. */
+bool odrive_link_queue_read(const char *path);
+odr_read_state_t odrive_link_read_poll(float *value);
+
+/** Wheel angle from the centre and wheel velocity, in wheel turns and turns/s
+ *  in the MOTOR frame (no HID inversion), plus the age of the sample.
+ *  false before the first sample/centre. */
+bool odrive_link_wheel(uint32_t now_ms, float *angle_turns, float *vel_turns_s, uint32_t *age_ms);
+#endif
 
 #endif /* ODRIVE_LINK_H */

@@ -46,12 +46,39 @@ void odrive_link_request(uint32_t now_ms)
 {
   if (odr_may_send(&s_odr, now_ms))
   {
-    if (odrive_uart_send_readonly(odr_request(&s_odr)))
+    /* "f <axis>" or, in FFB builds, a queued one-shot "r <path>". Both pass
+     * the read-only allowlist inside odrive_uart_send_readonly(). */
+    if (odrive_uart_send_readonly(odr_next_request(&s_odr)))
     {
       odr_note_sent(&s_odr, now_ms);
     }
   }
 }
+
+#if WHEEL_FFB
+bool odrive_link_queue_read(const char *path)
+{
+  return odr_queue_read(&s_odr, path);
+}
+
+odr_read_state_t odrive_link_read_poll(float *value)
+{
+  return odr_read_poll(&s_odr, value);
+}
+
+bool odrive_link_wheel(uint32_t now_ms, float *angle_turns, float *vel_turns_s, uint32_t *age_ms)
+{
+  if (!s_odr.have_data || !s_map.centred)
+  {
+    return false;
+  }
+  /* motor frame (no HID inversion): + = direction of increasing pos_estimate */
+  *angle_turns = (s_odr.pos_turns - s_map.centre_turns) / ODRIVE_TURNS_PER_WHEEL_REV;
+  *vel_turns_s = s_odr.vel_turns_s / ODRIVE_TURNS_PER_WHEEL_REV;
+  *age_ms = now_ms - s_odr.last_ok_ms;
+  return true;
+}
+#endif
 
 bool odrive_link_ok(uint32_t now_ms)
 {

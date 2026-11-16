@@ -225,6 +225,11 @@ bool odr_may_send(odr_t *r, uint32_t now_ms)
   {
     r->outstanding = false;
     r->stats.timeouts++;
+    if (r->read_state == ODR_READ_PENDING)
+    {
+      r->read_state = ODR_READ_FAILED;
+      r->stats.read_timeouts++;
+    }
     return true;
   }
   return false;
@@ -235,6 +240,149 @@ void odr_note_sent(odr_t *r, uint32_t now_ms)
   r->outstanding = true;
   r->sent_ms = now_ms;
   r->stats.requests++;
+  if (r->read_state == ODR_READ_QUEUED)
+  {
+    r->read_state = ODR_READ_PENDING;   /* what was sent was the read */
+  }
+}
+
+/* ---------------------------------------------------------------------- */
+/* One-shot reads                                                         */
+/* ---------------------------------------------------------------------- */
+static bool word_is(const char *p, const char *word)
+{
+  const size_t n = strlen(word);
+  return (strncmp(p, word, n) == 0) && (*skip_blanks(p + n) == '\0');
+}
+
+bool odr_parse_single_line(const char *line, float *out)
+{
+  const char *p = skip_blanks(line);
+  float v;
+
+  if (word_is(p, "True") || word_is(p, "true"))
+  {
+    *out = 1.0f;
+    return true;
+  }
+  if (word_is(p, "False") || word_is(p, "false"))
+  {
+    *out = 0.0f;
+    return true;
+  }
+  if (!odr_parse_float(p, &p, &v) || (*skip_blanks(p) != '\0'))
+  {
+    return false;
+  }
+  *out = v;
+  return true;
+}
+
+bool odr_queue_read(odr_t *r, const char *path)
+{
+  size_t n;
+
+  if ((path == NULL) || (r->read_state != ODR_READ_IDLE))
+  {
+    return false;
+  }
+  n = strlen(path);
+  if ((n == 0U) || (n + 4U > ODR_CMD_MAX))
+  {
+    return false;
+  }
+  r->read_cmd[0] = 'r';
+  r->read_cmd[1] = ' ';
+  memcpy(&r->read_cmd[2], path, n);
+  r->read_cmd[2U + n] = '\n';
+  r->read_cmd[3U + n] = '\0';
+  if (!odrive_cmd_is_readonly(r->read_cmd))
+  {
+    r->read_cmd[0] = '\0';
+    return false;
+  }
+  r->read_state = ODR_READ_QUEUED;
+  return true;
+}
+
+const char *odr_next_request(const odr_t *r)
+{
+  return (r->read_state == ODR_READ_QUEUED) ? r->read_cmd : r->cmd;
+}
+
+odr_read_state_t odr_read_poll(odr_t *r, float *value)
+{
+  const odr_read_state_t s = r->read_state;
+
+  if (s == ODR_READ_DONE)
+  {
+    *value = r->read_value;
+    r->read_state = ODR_READ_IDLE;
+  }
+  else if (s == ODR_READ_FAILED)
+  {
+    r->read_state = ODR_READ_IDLE;
+  }
+  return s;
+}
+
+static void strip_newline(char *dst, const char *src)
+{
+  size_t n = strlen(src);
+
+  memcpy(dst, src, n);
+  if (n > 0U && dst[n - 1U] == '\n')
+  {
+    n--;
+  }
+  dst[n] = '\0';
+}
+
+/** A line while a read is pending: single value -> DONE, feedback line ->
+ *  late position reply (used, read stays pending), echo/blank -> ignored,
+ *  anything else -> the read FAILED. Returns false if not consumed. */
+static bool handle_read_line(odr_t *r, const char *echo_f, uint32_t now_ms)
+{
+  char echo_r[ODR_CMD_MAX];
+  float a = 0.0f;
+  float b = 0.0f;
+
+  strip_newline(echo_r, r->read_cmd);
+  switch (odr_parse_feedback_line(r->line, echo_r, &a, &b))
+  {
+    case ODR_LINE_OK:
+      r->pos_turns = a;          /* late reply to an earlier "f" request */
+      r->vel_turns_s = b;
+      r->have_data = true;
+      r->last_ok_ms = now_ms;
+      r->stats.replies_ok++;
+      return true;
+    case ODR_LINE_ECHO:
+      r->stats.echo_lines++;
+      return true;
+    case ODR_LINE_EMPTY:
+      return true;
+    default:
+      break;
+  }
+  if ((echo_f != NULL) && word_is(skip_blanks(r->line), echo_f))
+  {
+    r->stats.echo_lines++;
+    return true;
+  }
+  if (odr_parse_single_line(r->line, &a))
+  {
+    r->read_value = a;
+    r->read_state = ODR_READ_DONE;
+    r->stats.reads_ok++;
+  }
+  else
+  {
+    r->read_state = ODR_READ_FAILED;
+    r->stats.read_errors++;
+  }
+  r->outstanding = false;
+  return true;
 }
 
 static void handle_line(odr_t *r, uint32_t now_ms)
@@ -242,16 +390,14 @@ static void handle_line(odr_t *r, uint32_t now_ms)
   char echo[ODR_CMD_MAX];
   float pos = 0.0f;
   float vel = 0.0f;
-  size_t n = strlen(r->cmd);
 
-  memcpy(echo, r->cmd, n);
-  if (n > 0U && echo[n - 1U] == '\n')
-  {
-    n--;
-  }
-  echo[n] = '\0';
+  strip_newline(echo, r->cmd);
 
   r->line[r->len] = '\0';
+  if ((r->read_state == ODR_READ_PENDING) && handle_read_line(r, echo, now_ms))
+  {
+    return;
+  }
   switch (odr_parse_feedback_line(r->line, echo, &pos, &vel))
   {
     case ODR_LINE_OK:

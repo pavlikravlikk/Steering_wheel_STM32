@@ -16,6 +16,9 @@
 #include "odrive_link.h"
 #include "sched.h"
 #include "wheel_config.h"
+#if WHEEL_FFB
+#include "ffb_board.h"   /* force feedback: only with -DWHEEL_FFB=ON */
+#endif
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -41,7 +44,7 @@ I2C_HandleTypeDef hi2c1;
 SPI_HandleTypeDef hspi1;
 
 /* USER CODE BEGIN PV */
-#if (STEERING_SOURCE == STEERING_SOURCE_ODRIVE) && !SIMULATE_INPUTS
+#if (STEERING_SOURCE == STEERING_SOURCE_ODRIVE) && !SIMULATE_INPUTS && !WHEEL_FFB
 static uint32_t s_odrive_poll_ms;   /* scheduler: last ODrive position request */
 #endif
 /* USER CODE END PV */
@@ -104,6 +107,9 @@ int main(void)
   MX_USB_DEVICE_Init();
   /* USER CODE BEGIN 2 */
   hid_report_init();   /* steering source (ODrive UART / encoder / pot), MCP23017, 1 kHz TIM6 tick */
+#if WHEEL_FFB
+  ffb_board_init();    /* HID PID USB class, FFB safety state machine (starts DISARMED) */
+#endif
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -117,10 +123,17 @@ int main(void)
 #if (STEERING_SOURCE == STEERING_SOURCE_ODRIVE) && !SIMULATE_INPUTS
     const uint32_t now = HAL_GetTick();
     odrive_link_process(now);
+#if !WHEEL_FFB
     if (sched_due(&s_odrive_poll_ms, ODRIVE_POLL_PERIOD_MS, now))
     {
       odrive_link_request(now);
     }
+#endif
+#endif
+#if WHEEL_FFB
+    /* FFB build: the FFB cycle (every FFB_COMMAND_PERIOD_MS) owns the ODrive
+     * requests: position/property read first, then the allowlisted writes. */
+    ffb_board_poll(HAL_GetTick());
 #endif
     hid_report_poll();   /* once per 1 ms tick: inputs -> USB HID report, never blocks */
     /* USER CODE END WHILE */

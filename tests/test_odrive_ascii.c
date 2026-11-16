@@ -237,6 +237,112 @@ TEST(test_error_reply_clears_outstanding)
   CHECK(odr_is_stale(&r, 1));
 }
 
+/* ---------------- one-shot reads (FFB precheck) ---------------- */
+TEST(test_single_line_parser)
+{
+  float v = -1.0f;
+  CHECK(odr_parse_single_line("24.087744", &v)); CHECK_NEAR(v, 24.087744, 1e-4);
+  CHECK(odr_parse_single_line(" 1 ", &v));       CHECK_NEAR(v, 1, 0);
+  CHECK(odr_parse_single_line("True", &v));      CHECK_NEAR(v, 1, 0);
+  CHECK(odr_parse_single_line("false", &v));     CHECK_NEAR(v, 0, 0);
+  CHECK(!odr_parse_single_line("1.0 2.0", &v));
+  CHECK(!odr_parse_single_line("invalid property", &v));
+  CHECK(!odr_parse_single_line("Truex", &v));
+  CHECK(!odr_parse_single_line("nan", &v));
+  CHECK(!odr_parse_single_line("", &v));
+}
+
+TEST(test_queue_read_builds_readonly_request)
+{
+  odr_t r;
+  odr_init(&r, 0, 8, 100);
+  CHECK(strcmp(odr_next_request(&r), "f 0\n") == 0);
+  CHECK(odr_queue_read(&r, "axis0.motor.is_calibrated"));
+  CHECK(strcmp(odr_next_request(&r), "r axis0.motor.is_calibrated\n") == 0);
+  CHECK(odrive_cmd_is_readonly(odr_next_request(&r)));
+  CHECK(!odr_queue_read(&r, "vbus_voltage"));          /* one at a time */
+  /* nothing that is not a pure path can be queued */
+  odr_init(&r, 0, 8, 100);
+  CHECK(!odr_queue_read(&r, "axis0.x 1"));
+  CHECK(!odr_queue_read(&r, "a\nw b 1"));
+  CHECK(!odr_queue_read(&r, ""));
+  CHECK(!odr_queue_read(&r, NULL));
+  CHECK(!odr_queue_read(&r, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"));
+  CHECK_EQ_INT(r.read_state, ODR_READ_IDLE);
+  CHECK(strcmp(odr_next_request(&r), "f 0\n") == 0);
+}
+
+TEST(test_read_roundtrip_and_feedback_resumes)
+{
+  odr_t r;
+  float v = 0.0f;
+  odr_init(&r, 0, 8, 100);
+  CHECK(odr_queue_read(&r, "vbus_voltage"));
+  CHECK(odr_may_send(&r, 0));
+  odr_note_sent(&r, 0);
+  CHECK_EQ_INT(odr_read_poll(&r, &v), ODR_READ_PENDING);
+  CHECK(!odr_may_send(&r, 1));
+  feed_str(&r, "24.1\r\n", 2);
+  CHECK_EQ_INT(odr_read_poll(&r, &v), ODR_READ_DONE);
+  CHECK_NEAR(v, 24.1, 1e-4);
+  CHECK_EQ_INT(odr_read_poll(&r, &v), ODR_READ_IDLE);  /* reported once */
+  CHECK_EQ_INT(r.stats.reads_ok, 1);
+  CHECK_EQ_INT(r.stats.parse_errors, 0);
+  CHECK(odr_may_send(&r, 3));
+  CHECK(strcmp(odr_next_request(&r), "f 0\n") == 0);
+  odr_note_sent(&r, 3);
+  feed_str(&r, "0.5 0.0\r\n", 4);
+  CHECK_NEAR(r.pos_turns, 0.5, 1e-6);
+}
+
+TEST(test_read_error_reply_and_timeout_fail)
+{
+  odr_t r;
+  float v = 0.0f;
+  odr_init(&r, 0, 8, 100);
+  CHECK(odr_queue_read(&r, "axis0.does_not_exist"));
+  odr_note_sent(&r, 0);
+  feed_str(&r, "invalid property\r\n", 1);
+  CHECK_EQ_INT(odr_read_poll(&r, &v), ODR_READ_FAILED);
+  CHECK_EQ_INT(r.stats.read_errors, 1);
+  CHECK(odr_may_send(&r, 2));                     /* answered: not outstanding */
+
+  CHECK(odr_queue_read(&r, "vbus_voltage"));
+  odr_note_sent(&r, 10);
+  CHECK(!odr_may_send(&r, 17));
+  CHECK(odr_may_send(&r, 18));                    /* timeout */
+  CHECK_EQ_INT(odr_read_poll(&r, &v), ODR_READ_FAILED);
+  CHECK_EQ_INT(r.stats.read_timeouts, 1);
+}
+
+TEST(test_late_feedback_during_read_is_used_not_taken_as_value)
+{
+  odr_t r;
+  float v = 0.0f;
+  odr_init(&r, 0, 8, 100);
+  CHECK(odr_queue_read(&r, "axis0.encoder.is_ready"));
+  odr_note_sent(&r, 0);
+  feed_str(&r, "1.25 0.0\r\n", 1);                /* late "f" reply */
+  CHECK_EQ_INT(odr_read_poll(&r, &v), ODR_READ_PENDING);
+  CHECK_NEAR(r.pos_turns, 1.25, 1e-6);
+  feed_str(&r, "r axis0.encoder.is_ready\r\n", 2); /* echo of the read */
+  CHECK_EQ_INT(odr_read_poll(&r, &v), ODR_READ_PENDING);
+  feed_str(&r, "1\r\n", 3);
+  CHECK_EQ_INT(odr_read_poll(&r, &v), ODR_READ_DONE);
+  CHECK_NEAR(v, 1.0, 0);
+}
+
+TEST(test_single_value_without_read_is_still_a_parse_error)
+{
+  odr_t r;
+  odr_init(&r, 0, 8, 100);
+  odr_note_sent(&r, 0);
+  feed_str(&r, "24.1\r\n", 1);
+  CHECK_EQ_INT(r.stats.parse_errors, 1);
+  CHECK_EQ_INT(r.stats.reads_ok, 0);
+  CHECK(!r.have_data);
+}
+
 void run_odrive_ascii_tests(void)
 {
   printf("odrive_ascii\n");
@@ -253,4 +359,10 @@ void run_odrive_ascii_tests(void)
   RUN(test_stream_overflow);
   RUN(test_timeout_and_stale);
   RUN(test_error_reply_clears_outstanding);
+  RUN(test_single_line_parser);
+  RUN(test_queue_read_builds_readonly_request);
+  RUN(test_read_roundtrip_and_feedback_resumes);
+  RUN(test_read_error_reply_and_timeout_fail);
+  RUN(test_late_feedback_during_read_is_used_not_taken_as_value);
+  RUN(test_single_value_without_read_is_still_a_parse_error);
 }

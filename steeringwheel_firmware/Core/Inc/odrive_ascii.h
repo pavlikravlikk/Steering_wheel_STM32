@@ -37,7 +37,20 @@ typedef struct
   uint32_t echo_lines;    /* echoed commands (ignored)                     */
   uint32_t overflows;     /* lines longer than ODR_LINE_MAX (discarded)    */
   uint32_t timeouts;      /* request without a reply in time               */
+  uint32_t reads_ok;      /* one-shot "r <path>" reads answered            */
+  uint32_t read_errors;   /* ...answered with something non-numeric        */
+  uint32_t read_timeouts; /* ...not answered in time                       */
 } odr_stats_t;
+
+/* One-shot property read ("r <path>"), used only by the FFB precheck. */
+typedef enum
+{
+  ODR_READ_IDLE = 0,   /* nothing queued                                   */
+  ODR_READ_QUEUED,     /* next request will be the read                    */
+  ODR_READ_PENDING,    /* sent, waiting for the single-value reply         */
+  ODR_READ_DONE,       /* value available (odr_read_poll)                  */
+  ODR_READ_FAILED      /* error reply or timeout (odr_read_poll)           */
+} odr_read_state_t;
 
 typedef struct
 {
@@ -60,6 +73,11 @@ typedef struct
   float    pos_turns;
   float    vel_turns_s;
   uint32_t last_ok_ms;
+
+  /* one-shot read */
+  char             read_cmd[ODR_CMD_MAX];   /* "r <path>\n"                */
+  odr_read_state_t read_state;
+  float            read_value;
 
   odr_stats_t stats;
 } odr_t;
@@ -98,5 +116,23 @@ void odr_feed(odr_t *r, const uint8_t *data, size_t n, uint32_t now_ms);
 /** true once at least one valid reply arrived and none for stale_ms. Also
  *  true before the first valid reply. */
 bool odr_is_stale(const odr_t *r, uint32_t now_ms);
+
+/* ---- one-shot reads ("r <path>"); still strictly read-only ------------- */
+
+/** Parse a single-value reply: a number, or True/False (-> 1/0). */
+bool odr_parse_single_line(const char *line, float *out);
+
+/** Queue "r <path>\n" as the next request. Refused (false) while another
+ *  read is queued/pending/unconsumed or if the result would not pass
+ *  odrive_cmd_is_readonly(). */
+bool odr_queue_read(odr_t *r, const char *path);
+
+/** The next request to transmit: the queued read if any, else "f <axis>\n".
+ *  Pair every transmission with odr_note_sent(). */
+const char *odr_next_request(const odr_t *r);
+
+/** Returns ODR_READ_DONE (value in *value) or ODR_READ_FAILED exactly once
+ *  and then goes back to ODR_READ_IDLE; otherwise the current state. */
+odr_read_state_t odr_read_poll(odr_t *r, float *value);
 
 #endif /* ODRIVE_ASCII_H */

@@ -16,6 +16,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "wheel_config.h"
+
 typedef struct
 {
   uint32_t rx_dropped;     /* RX ring full                          */
@@ -30,6 +32,13 @@ void odrive_uart_init(void);
 /** Queue a read-only command for transmission. Never blocks. Returns false
  *  if refused (not read-only) or the transmitter is still busy. */
 bool odrive_uart_send_readonly(const char *cmd);
+
+#if WHEEL_FFB
+/** FFB builds only (Core/Src/ffb is the only caller): queue one allowlisted
+ *  write (ffb_cmd_is_allowed). @p urgent drops queued lines that have not
+ *  started. Never blocks. */
+bool odrive_uart_send_ffb(const char *cmd, bool urgent);
+#endif
 
 /** Copy up to @p max received bytes into @p buf. Never blocks. */
 size_t odrive_uart_read(uint8_t *buf, size_t max);

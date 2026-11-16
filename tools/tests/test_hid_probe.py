@@ -14,7 +14,7 @@ FFB_SAFETY_H = os.path.join(REPO, "steeringwheel_firmware", "Core", "Inc", "ffb"
 
 def c_enum(text, enum_name):
     """Parse 'typedef enum { A = 0, B, ... } enum_name;' -> {value: name-without-prefix}."""
-    m = re.search(r"typedef\s+enum\s*\{(.*?)\}\s*%s\s*;" % enum_name, text, re.S)
+    m = re.search(r"typedef\s+enum\s*\{([^{}]*)\}\s*%s\s*;" % enum_name, text)
     if not m:
         return None
     body = re.sub(r"/\*.*?\*/", "", m.group(1), flags=re.S)

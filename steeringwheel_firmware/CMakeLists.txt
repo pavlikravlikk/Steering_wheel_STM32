@@ -80,6 +80,17 @@ set_source_files_properties(
 # Force-feedback sources: compiled ONLY with -DWHEEL_FFB=ON (see below).
 # Everything that can write to the ODrive lives in Core/Src/ffb.
 set(WHEEL_FFB_SOURCES
+    Core/Src/ffb/ffb_board.c
+    Core/Src/ffb/ffb_cmd.c
+    Core/Src/ffb/ffb_effects.c
+    Core/Src/ffb/ffb_hid_desc.c
+    Core/Src/ffb/ffb_pid.c
+    Core/Src/ffb/ffb_precheck.c
+    Core/Src/ffb/ffb_safety.c
+    Core/Src/ffb/ffb_service.c
+    Core/Src/ffb/ffb_torque.c
+    Core/Src/ffb/ffb_ui.c
+    Core/Src/ffb/usbd_ffb_hid.c
 )
 
 # Add include paths

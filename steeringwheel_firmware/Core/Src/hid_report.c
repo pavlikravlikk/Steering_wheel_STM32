@@ -15,6 +15,16 @@
 #include "usbd_custom_hid_if.h"
 #include "wheel_config.h"
 
+#if WHEEL_FFB
+/* FFB build: HID PID descriptor, input report = Report ID 0x01 + 8 bytes. */
+#include "ffb_board.h"
+#include "ffb_hid_desc.h"
+#define HID_TX_LEN   FFB_LEN_JOYSTICK
+_Static_assert(FFB_LEN_JOYSTICK == HID_REPORT_SIZE + 1U, "FFB joystick report = ID + default report");
+#else
+#define HID_TX_LEN   HID_REPORT_SIZE
+#endif
+
 extern USBD_HandleTypeDef hUsbDeviceFS;
 extern ADC_HandleTypeDef  hadc1;
 extern I2C_HandleTypeDef  hi2c1;
@@ -29,7 +39,7 @@ _Static_assert(sizeof(JoystickReport_t) == 8U, "HID report must be 8 bytes");
 _Static_assert(HID_REPORT_SIZE == sizeof(JoystickReport_t), "hid_pack and descriptor disagree");
 
 static JoystickReport_t s_report;          /* logical values (host byte order)          */
-static uint8_t          s_tx[HID_REPORT_SIZE]; /* packed bytes; static: valid for the PMA copy */
+static uint8_t          s_tx[HID_TX_LEN];  /* packed bytes; static: valid for the PMA copy */
 static volatile uint8_t s_tick_pending;
 static uint32_t         s_ms;
 static uint32_t         s_heartbeat_ms;
@@ -160,7 +170,13 @@ static void centre_button_task(uint32_t now_ms)
   const uint16_t raw = (HAL_GPIO_ReadPin(B1_GPIO_Port, B1_Pin) == GPIO_PIN_SET) ? 1U : 0U;
   const bool pressed = (debounce_update(&s_b1_debounce, raw, now_ms) & 1U) != 0U;
 
+#if WHEEL_FFB
+  /* B1 + both paddles = arm gesture, B1 alone = disarm (Core/Src/ffb). */
+  ffb_board_buttons(HAL_GetTick(), pressed, s_report.buttons);
+  if (hold_update(&s_b1_hold, pressed, now_ms) && ffb_board_centre_allowed(HAL_GetTick()))
+#else
   if (hold_update(&s_b1_hold, pressed, now_ms))
+#endif
   {
     if (steering_set_centre())
     {
@@ -240,10 +256,21 @@ void hid_report_poll(void)
   status_leds(s_ms);
 
   /* 2. Send only when the previous IN transfer has completed. */
+#if WHEEL_FFB
+  if (ffb_board_usb_ready())
+  {
+    s_tx[0] = FFB_RID_JOYSTICK;
+    hid_pack_report(&s_tx[1], s_report.x, s_report.y, s_report.z,
+                    s_report.buttons, BUTTON_COUNT);
+    (void)ffb_board_send_joystick(s_tx);
+  }
+  (void)usb_ready_for_report;
+#else
   if (usb_ready_for_report() != 0U)
   {
     hid_pack_report(s_tx, s_report.x, s_report.y, s_report.z,
                     s_report.buttons, BUTTON_COUNT);
     (void)USBD_CUSTOM_HID_SendReport(&hUsbDeviceFS, s_tx, (uint16_t)sizeof(s_tx));
   }
+#endif
 }

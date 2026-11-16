@@ -16,10 +16,22 @@
 
 #define ODRIVE_UART_IRQ_PRIO  1U
 
+#if WHEEL_FFB
+/* FFB build: a small queue of whole command lines (requests + allowlisted
+ * writes, see odrive_uart_send_ffb()). */
+#include "ffb_cmd.h"
+#define ODRIVE_TX_BUF_SIZE    160U
+typedef uint16_t tx_idx_t;
+#else
+/* Default build: exactly one read-only command at a time. */
+#define ODRIVE_TX_BUF_SIZE    ODR_CMD_MAX
+typedef uint8_t tx_idx_t;
+#endif
+
 static ring_buffer_t       s_rx;
-static uint8_t             s_tx[ODR_CMD_MAX];
-static volatile uint8_t    s_tx_len;
-static volatile uint8_t    s_tx_pos;
+static uint8_t             s_tx[ODRIVE_TX_BUF_SIZE];
+static volatile tx_idx_t   s_tx_len;
+static volatile tx_idx_t   s_tx_pos;
 static volatile bool       s_tx_active;
 static odrive_uart_stats_t s_stats;
 
@@ -63,6 +75,7 @@ void odrive_uart_init(void)
   HAL_NVIC_EnableIRQ(USART1_IRQn);
 }
 
+#if !WHEEL_FFB
 bool odrive_uart_send_readonly(const char *cmd)
 {
   size_t n;
@@ -85,6 +98,84 @@ bool odrive_uart_send_readonly(const char *cmd)
   USART1->CR1 |= USART_CR1_TXEIE;   /* ISR feeds TDR */
   return true;
 }
+#else /* WHEEL_FFB */
+/* Append one complete line. With @p urgent, every queued line that has not
+ * started yet is dropped first (the line on the wire is finished, so the
+ * ODrive never sees a truncated command). Runs with the USART1 IRQ masked
+ * for a few microseconds; never waits. */
+static bool tx_enqueue(const char *cmd, bool urgent)
+{
+  const size_t n = strlen(cmd);
+  bool ok = false;
+
+  HAL_NVIC_DisableIRQ(USART1_IRQn);
+  if (!s_tx_active || (s_tx_pos >= s_tx_len))
+  {
+    s_tx_len = 0U;
+    s_tx_pos = 0U;
+  }
+  else
+  {
+    if (urgent)
+    {
+      tx_idx_t end = s_tx_pos;
+      if (end > 0U)
+      {
+        while ((end < s_tx_len) && (s_tx[end - 1U] != '\n'))
+        {
+          end++;                       /* finish the line being sent */
+        }
+      }
+      s_tx_len = end;
+    }
+    if (s_tx_pos > 0U)                 /* compact: unsent bytes to the front */
+    {
+      memmove(s_tx, &s_tx[s_tx_pos], (size_t)(s_tx_len - s_tx_pos));
+      s_tx_len = (tx_idx_t)(s_tx_len - s_tx_pos);
+      s_tx_pos = 0U;
+    }
+  }
+  if ((n > 0U) && ((size_t)s_tx_len + n <= ODRIVE_TX_BUF_SIZE))
+  {
+    memcpy(&s_tx[s_tx_len], cmd, n);
+    s_tx_len = (tx_idx_t)(s_tx_len + n);
+    ok = true;
+  }
+  if (s_tx_len > s_tx_pos)
+  {
+    s_tx_active = true;
+    USART1->CR1 |= USART_CR1_TXEIE;   /* ISR feeds TDR */
+  }
+  HAL_NVIC_EnableIRQ(USART1_IRQn);
+  if (!ok)
+  {
+    s_stats.tx_busy++;
+  }
+  return ok;
+}
+
+bool odrive_uart_send_readonly(const char *cmd)
+{
+  if (!odrive_cmd_is_readonly(cmd))
+  {
+    s_stats.tx_refused++;
+    return false;
+  }
+  return tx_enqueue(cmd, false);
+}
+
+bool odrive_uart_send_ffb(const char *cmd, bool urgent)
+{
+  /* The ONLY write entry point: torque setpoint, IDLE/CLOSED_LOOP request,
+   * watchdog feed - nothing else passes ffb_cmd_is_allowed(). */
+  if (!ffb_cmd_is_allowed(cmd, ODRIVE_AXIS))
+  {
+    s_stats.tx_refused++;
+    return false;
+  }
+  return tx_enqueue(cmd, urgent);
+}
+#endif /* WHEEL_FFB */
 
 size_t odrive_uart_read(uint8_t *buf, size_t max)
 {
