@@ -92,8 +92,8 @@ If a check fails the wheel stays DISARMED and shows the reason (section 6).
 - Brake/regen (from the REAL dump): `dc_max_negative_current = -3.0 A`, a **2 ohm brake
   resistor armed automatically** (`brake_resistor_armed True`, no enable switch in this build)
   and `max_regen_current = 0.0` (no regen current into the PSU allowed). Back-driving the
-  motor dumps energy into that resistor. Its fitting, value and power rating are unverified
-  (TBD). The Mean Well RSP-320-24 cannot sink current: if the resistor path does not absorb
+  motor dumps energy into that resistor. Its label reads 50 W / 2 ohm (user, 2026-11-16); heat sink,
+  wiring and the peak power (about 70-90 W at -3 A, above 50 W continuous) are unverified (TBD). The Mean Well RSP-320-24 cannot sink current: if the resistor path does not absorb
   the energy, the bus rises until the over-voltage trip (56 V saved, 30 V in the gentle
   profile). Choosing the regen limits is a human bring-up decision (`docs/DECISIONS.md`).
 - The direction of game forces (`FFB_INVERT_HOST_FORCE`) and of the spring sign were derived
