@@ -12,7 +12,11 @@ FW_SRCS := $(FW)/Src/hid_pack.c \
            $(FW)/Src/odrive_link.c \
            $(FW)/Src/debounce.c \
            $(FW)/Src/mcp23017_core.c \
-           $(FW)/Src/centering_law.c
+           $(FW)/Src/centering_law.c \
+           $(FW)/Src/settings.c \
+           $(FW)/Src/axis_shape.c \
+           $(FW)/Src/board_health.c
+CFLAGS  += -DBOARD_HEALTH_HOST
 
 # Pure force-feedback modules (Core/Src/ffb). ffb_board.c and usbd_ffb_hid.c
 # are hardware glue and are only compiled into the firmware.

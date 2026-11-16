@@ -19,6 +19,8 @@
 #if WHEEL_FFB
 #include "ffb_board.h"   /* force feedback: only with -DWHEEL_FFB=ON */
 #endif
+#include "board_health.h"   /* IWDG / reset-reason LED, both off by default */
+#define BOARD_HEALTH_USED (IWDG_ENABLE || RESET_REASON_LED)
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -107,6 +109,9 @@ int main(void)
   MX_USB_DEVICE_Init();
   /* USER CODE BEGIN 2 */
   hid_report_init();   /* steering source (ODrive UART / encoder / pot), MCP23017, 1 kHz TIM6 tick */
+#if BOARD_HEALTH_USED
+  board_health_init();
+#endif
 #if WHEEL_FFB
   ffb_board_init();    /* HID PID USB class, FFB safety state machine (starts DISARMED) */
 #endif
@@ -136,6 +141,9 @@ int main(void)
     ffb_board_poll(HAL_GetTick());
 #endif
     hid_report_poll();   /* once per 1 ms tick: inputs -> USB HID report, never blocks */
+#if BOARD_HEALTH_USED
+    board_health_poll(HAL_GetTick());   /* IWDG refresh (if enabled) */
+#endif
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */

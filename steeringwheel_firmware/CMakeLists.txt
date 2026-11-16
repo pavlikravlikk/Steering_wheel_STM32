@@ -60,6 +60,10 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     Core/Src/steering_map.c
     Core/Src/debounce.c
     Core/Src/mcp23017_core.c
+    Core/Src/axis_shape.c
+    Core/Src/board_health.c
+    Core/Src/settings.c
+    Core/Src/settings_flash_stm32.c
 )
 
 # Be strict with our own sources (generated CubeMX code keeps default flags)
@@ -75,6 +79,10 @@ set_source_files_properties(
     Core/Src/steering_map.c
     Core/Src/debounce.c
     Core/Src/mcp23017_core.c
+    Core/Src/axis_shape.c
+    Core/Src/board_health.c
+    Core/Src/settings.c
+    Core/Src/settings_flash_stm32.c
     PROPERTIES COMPILE_OPTIONS "-Wall;-Wextra")
 
 # Force-feedback sources: compiled ONLY with -DWHEEL_FFB=ON (see below).
@@ -118,7 +126,12 @@ option(WHEEL_FFB "Build the force-feedback module (can command the motor)" OFF)
 set(WHEEL_FFB_ARM_ALLOWED "0" CACHE STRING "1 = FFB may arm the motor (needs WHEEL_FFB=ON)")
 set_property(CACHE WHEEL_FFB_ARM_ALLOWED PROPERTY STRINGS 0 1)
 
-set(WHEEL_DEFINES STEERING_SOURCE=STEERING_SOURCE_${STEERING_SOURCE})
+#   -DWHEEL_EXTRA_DEFINES="A=1;B=2"  extra macros, e.g. the optional features
+#                                   IWDG_ENABLE, RESET_REASON_LED, AXIS_SHAPING_ENABLE,
+#                                   SETTINGS_FLASH_ENABLE, ODRIVE_RECENTRE_AFTER_STALE_MS
+set(WHEEL_EXTRA_DEFINES "" CACHE STRING "Extra compile definitions (semicolon list)")
+
+set(WHEEL_DEFINES STEERING_SOURCE=STEERING_SOURCE_${STEERING_SOURCE} ${WHEEL_EXTRA_DEFINES})
 if(SIMULATE_INPUTS)
     list(APPEND WHEEL_DEFINES SIMULATE_INPUTS=1)
 endif()

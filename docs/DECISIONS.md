@@ -146,3 +146,25 @@ One line per decision: **what** — why — how to change it.
   reads a stale success. — no shared mutable engine state — `ffb_pid.c`.
 - **Host gone:** USB not configured / suspended, actuators disabled, reset, stop-all, class DeInit -> no game force.
 - **Mutation tests** `tools/mutation_test.sh` (17 mutations, all killed) are part of `tools/check_all.sh`.
+
+## Step 3: extras (each OFF by default; compile-checked ON by `check_all.sh` config `extras_on_compile_only`)
+- **Persistent settings** `settings.c` (pure) + `settings_flash_stm32.c` (HAL, compiled empty unless
+  `SETTINGS_FLASH_ENABLE=1`): last 2 KB page 0x0803F800, 32-byte blob with magic, version, length, CRC-32 (IEEE);
+  empty/bad magic/bad version/bad CRC/out-of-range -> profile defaults. Write = erase + program + read-back
+  compare. `spring_kp` can never exceed the profile value. **Not wired into the application yet** (no caller loads
+  or saves): enabling needs (1) a reserved page in `STM32F303xx_FLASH.ld`, (2) a save trigger that is impossible
+  while FFB is RUNNING (erase stalls the CPU 20-40 ms), (3) a bench test: save, power-cycle, read back, then corrupt
+  the page with the debugger and confirm the defaults come back. — "default OFF until tested on hardware".
+- **IWDG** (`IWDG_ENABLE`, 500 ms) and **reset-reason LED** (`RESET_REASON_LED`, LD4 N flashes for 5 s, default builds
+  only): `board_health.c`; reason decoder unit-tested. IWDG frozen while the debugger halts the core. — off by default
+  because a stuck flash erase or a long debugger session would reset the board unexpectedly.
+- **Steering shaping** `axis_shape.c`: deadzone + cubic curve (`AXIS_SHAPING_ENABLE`, `AXIS_DEADZONE`, `AXIS_CURVE_K`);
+  exact identity with the defaults (tested for every 7th value). Not applied to FFB (the motor uses the raw angle).
+- **ODrive reboot re-centre** `ODRIVE_RECENTRE_AFTER_STALE_MS` (0 = off): after a long data gap the next sample becomes
+  the centre, because without an index the ODrive restarts its position at 0. Off by default (changes behaviour).
+- First report after power-up: X = 32768 until the first ODrive sample (unchanged, covered by `test_odrive_link`).
+- **Not done (time):** configurable button mapping table and long-press combos (set centre / angle preset), I2C bus
+  recovery (9 SCL pulses) for a stuck MCP23017. Notes for later: combos must never use B1 + both paddles (the FFB arm
+  gesture); bus recovery must be a state machine (one SCL edge per 1 ms tick), never a busy loop.
+- Settings field renamed `force_gain` (not `ffb_gain`): `tests/test_safety.c` forbids `ffb_` identifiers outside
+  `#if WHEEL_FFB` in non-ffb files - the check is strict on purpose.

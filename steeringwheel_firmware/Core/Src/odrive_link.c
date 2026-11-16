@@ -4,6 +4,7 @@
  */
 #include "odrive_link.h"
 
+#include "axis_shape.h"
 #include "odrive_uart.h"
 #include "steering_map.h"
 #include "wheel_config.h"
@@ -11,6 +12,10 @@
 static odr_t          s_odr;
 static steering_map_t s_map;
 static uint16_t       s_axis = 32768U;
+#if ODRIVE_RECENTRE_AFTER_STALE_MS > 0
+static bool           s_had_data;
+static uint32_t       s_last_ok_ms;
+#endif
 
 void odrive_link_init(void)
 {
@@ -34,6 +39,17 @@ void odrive_link_process(uint32_t now_ms)
 
   if (s_odr.stats.replies_ok != ok_before)
   {
+#if ODRIVE_RECENTRE_AFTER_STALE_MS > 0
+    /* Data was missing for a long time: the ODrive probably rebooted, and
+     * without an index pulse its position restarted at 0. Take the next
+     * sample as a new power-up centre (off by default). */
+    if (s_map.centred && s_had_data && ((now_ms - s_last_ok_ms) >= ODRIVE_RECENTRE_AFTER_STALE_MS))
+    {
+      s_map.centred = false;
+    }
+    s_had_data = true;
+    s_last_ok_ms = now_ms;
+#endif
     if (!s_map.centred)
     {
       (void)steering_map_set_centre(&s_map, s_odr.pos_turns);  /* power-up centre */
@@ -87,7 +103,11 @@ bool odrive_link_ok(uint32_t now_ms)
 
 uint16_t odrive_link_axis16(void)
 {
+#if AXIS_SHAPING_ENABLE
+  return axis_shape(s_axis, AXIS_DEADZONE, AXIS_CURVE_K);
+#else
   return s_axis;
+#endif
 }
 
 bool odrive_link_position(uint32_t now_ms, float *pos_turns, float *vel_turns_s)

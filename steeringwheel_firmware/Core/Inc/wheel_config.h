@@ -140,6 +140,13 @@
 #define ODRIVE_TURNS_PER_WHEEL_REV    1.0f
 #endif
 
+/* 0 = off (default). > 0: if no valid position arrived for this long and
+ * data comes back, the ODrive probably rebooted (no index pulse: its
+ * position restarted at 0), so the next sample becomes the new centre. */
+#ifndef ODRIVE_RECENTRE_AFTER_STALE_MS
+#define ODRIVE_RECENTRE_AFTER_STALE_MS 0U
+#endif
+
 /* TODO(TBD): 1 = swap the steering direction of the ODrive source. */
 #ifndef ODRIVE_INVERT_DIRECTION
 #define ODRIVE_INVERT_DIRECTION       0

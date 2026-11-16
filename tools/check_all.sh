@@ -45,6 +45,7 @@ CONFIGS=(
   "simulate|-DSIMULATE_INPUTS=ON"
   "ffb_noarm|-DWHEEL_FFB=ON -DWHEEL_FFB_ARM_ALLOWED=0"
   "ffb_arm_compile_only|-DWHEEL_FFB=ON -DWHEEL_FFB_ARM_ALLOWED=1"
+  "extras_on_compile_only|-DWHEEL_EXTRA_DEFINES=IWDG_ENABLE=1;RESET_REASON_LED=1;AXIS_SHAPING_ENABLE=1;AXIS_DEADZONE=0.02f;AXIS_CURVE_K=0.3f;SETTINGS_FLASH_ENABLE=1;ODRIVE_RECENTRE_AFTER_STALE_MS=1000U"
 )
 # Tokens that only an ODrive WRITE path can contain.
 WRITE_TOKENS=("input_torque" "requested_state" "save_configuration" "w axis" "u 0")
@@ -54,7 +55,7 @@ build_config() {  # name, options
   # shellcheck disable=SC2086
   cmake -S "$FW" -B "$dir" -G Ninja -DCMAKE_TOOLCHAIN_FILE=cmake/gcc-arm-none-eabi.cmake \
         -DCMAKE_BUILD_TYPE=Debug -DSTEERING_SOURCE=ODRIVE -DSIMULATE_INPUTS=OFF \
-        -DWHEEL_FFB=OFF -DWHEEL_FFB_ARM_ALLOWED=0 $opts >"$dir.configure.log" 2>&1 || return 1
+        -DWHEEL_FFB=OFF -DWHEEL_FFB_ARM_ALLOWED=0 -DWHEEL_EXTRA_DEFINES= $opts >"$dir.configure.log" 2>&1 || return 1
   cmake --build "$dir" --clean-first >"$dir.build.log" 2>&1 || return 1
   if grep -E "warning:" "$dir.build.log" | grep -v -E "Drivers/|Middlewares/" | grep -q .; then
     echo "warnings in $name" >&2; return 1
@@ -77,7 +78,7 @@ if command -v arm-none-eabi-gcc >/dev/null && command -v ninja >/dev/null; then
     if build_config "$name" "$opts"; then
       record "build $name (0 warnings)" "PASS  $(awk '{print "text="$1" data="$2" bss="$3}' "$BUILD_ROOT/fw_$name.size")"
       case "$name" in
-        default|simulate) run_step "binary scan $name: no write tokens" scan_bin "$BUILD_ROOT/fw_$name" absent ;;
+        default|simulate|extras_on_compile_only) run_step "binary scan $name: no write tokens" scan_bin "$BUILD_ROOT/fw_$name" absent ;;
         *)                run_step "binary scan $name: tokens present (scanner works)" scan_bin "$BUILD_ROOT/fw_$name" present ;;
       esac
     else
