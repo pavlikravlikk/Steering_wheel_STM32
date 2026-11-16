@@ -39,3 +39,54 @@ One line per decision: **what** — why — how to change it.
 - CMake cache default for `STEERING_SOURCE` changed to `ODRIVE`; an existing build directory keeps its cached value, so pass `-DSTEERING_SOURCE=ODRIVE` once. — CMake semantics — `docs/BENCH_CHECKLIST.md` step 0.
 - `tests/test_safety.c` scans all firmware sources for ODrive write tokens (`requested_state`, `input_torque`, `.startup_`, `"w `, `"c `, ...) and fails if `centering_law.c` appears in the firmware CMake sources (mutation-tested). — guard against accidental motor-command paths — edit the test only together with an approved design change.
 - Tests live in repo-root `tests/` (plain `gcc`, `make -C tests`). — single command — `tests/README.md`.
+
+---
+
+# Session 2 (unattended, 2026-11-16)
+
+## Starting state
+- `git status`: branch `wip-local`, "up to date with 'origin/wip-local'", clean. HEAD `1b70668`.
+  64 host tests pass; default ARM build 0 warnings. Default binary saved as baseline.
+- The teammates' zip was only *listed* this time (not extracted, nothing executed, nothing read
+  beyond the file list); the PID/FFB code here is written from the USB PID spec and the
+  requirements of the Linux driver.
+
+## Step 1: profile and tools
+- **One profile file** `config/hardware_profile.toml`, every entry `{value, status, how_to_measure}`,
+  placeholders = last night's values, all `TBD` (a few pure design choices are `assumed`). — task — edit the file.
+- **cpr = counts per MOTOR turn** = `4 * PPR * teeth_housing / teeth_pulley` (what the ODrive needs for
+  commutation, since it believes the encoder sits on the motor). Therefore ODrive "turns" = motor turns and
+  `ODRIVE_TURNS_PER_WHEEL_REV = motor.motor_turns_per_wheel_rev` (1.0 for direct drive). — physics of the
+  ODrive commutation — `gen_config.derive()`.
+- `wheel_config.h` includes `wheel_config_generated.h`; every generated macro is `#ifndef`-guarded, the old
+  `#ifndef` defaults stay as fallbacks. **The default binary is byte-identical** to the end of last night
+  (checked with `cmp` against the saved baseline). — hard rule 1 — n/a.
+- CMake regenerates the header when the profile changes (Python 3.11+ found), otherwise uses the committed
+  file; an invalid profile fails the build. — "change the profile and rebuild is enough" — `CMakeLists.txt`.
+- The generated header lists no ODrive property names (the TBD list is in `make status` instead), because
+  `tests/test_safety.c` forbids those names in firmware sources outside `ffb/`. — keep the guard strict — n/a.
+- Gentle-profile values chosen (all `TBD`): `current_lim` 4 A, `calibration_current` 3 A, `vel_limit`
+  2 turns/s, over/under-voltage trip 30/18 V, `dc_max_positive_current` 6 A, `dc_max_negative_current`
+  **-0.01 A** (0.5.x default; a lab supply cannot sink regen current, so regen trips and disarms rather than
+  pumping the bus), watchdog 0.25 s enabled, `control_mode` = torque (1), `input_mode` = passthrough (1),
+  `enable_torque_mode_vel_limit` = true. — conservative — profile.
+- `odrive_setup.py` also writes `startup_closed_loop_control = False` and
+  `startup_encoder_offset_calibration = False` (already False; writing False is defensive). It never touches
+  `requested_state`, never saves without `--save`, refuses unless IDLE and vbus in the FFB window, verifies by
+  read-back and **skips properties that do not exist** on the unnumbered build. — task — `gen_config.py`.
+- `odrive_calibrate.py`: preflight (IDLE, vbus, no errors, limits/cpr equal to the profile), typed confirmation
+  `I AM CLEAR`, MOTOR_CALIBRATION only if needed, then ENCODER_OFFSET_CALIBRATION, Ctrl+C -> IDLE. With
+  `--save` it sets only `motor.config.pre_calibrated` (encoder pre-calibration is not meaningful without an
+  index pulse in 0.5.x, as far as I know: TODO(TBD) confirm). — task — generator.
+- ODrive enums/error tables from the **0.5.6 documentation** (`tools/odrive_enums.py`), plus the legacy 0.5.1
+  axis bits labelled as such. Licence: documentation facts, own code. — unnumbered firmware — verify against
+  `odrivetool`'s output.
+- `tools/odrive_status.py` accepts flat (`a.b = v`) and odrivetool tree dumps; `--live` uses only `getattr`.
+  `docs/odrive_dump.txt` did not exist, so the test fixtures in `tools/tests/fixtures/` are **synthetic**,
+  built from the facts in the task, and labelled so. — no hardware — replace with the real dump in H2.
+- `tools/hid_probe.py` defines the FFB status feature report layout (ID 0x40, 16 bytes) that the firmware
+  implements; a unit test parses `Core/Inc/ffb/ffb_safety.h` to keep the enum tables in sync. — single
+  definition checked both ways — n/a.
+- Python tests: `python3 -m unittest discover -s tools/tests -t tools` (stdlib only). `make test` runs C+Python.
+- `stm_32_wheel.py`: shows Y/Z bars and 16 buttons; accepts the 8-byte report and the FFB build's 9-byte
+  report (ID 0x01); other report IDs are ignored. Its parser is unit-tested without pygame (AST extraction).
