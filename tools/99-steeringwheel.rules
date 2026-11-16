@@ -9,7 +9,9 @@
 #         getfacl /dev/hidrawN
 #
 # hidraw: raw reports for tools/hid_probe.py and stm_32_wheel.py
-KERNEL=="hidraw*", ATTRS{idVendor}=="0483", ATTRS{idProduct}=="5752", MODE="0660", TAG+="uaccess"
+# GROUP="plugdev" added 2026-11-16: on the owner's machine the "uaccess" ACL was not applied on a
+# plain replug (Permission denied on /dev/hidraw0), so members of plugdev get access as well.
+KERNEL=="hidraw*", ATTRS{idVendor}=="0483", ATTRS{idProduct}=="5752", GROUP="plugdev", MODE="0660", TAG+="uaccess"
 # evdev: joystick + force feedback (evtest, fftest and games need write access
 # to the event node to upload effects in FFB builds)
-SUBSYSTEM=="input", ATTRS{idVendor}=="0483", ATTRS{idProduct}=="5752", MODE="0660", TAG+="uaccess"
+SUBSYSTEM=="input", ATTRS{idVendor}=="0483", ATTRS{idProduct}=="5752", GROUP="plugdev", MODE="0660", TAG+="uaccess"
