@@ -164,6 +164,16 @@ static void do_arm_gesture(ffb_service_t *s)
   run_ms(s, 20, false, 0);
 }
 
+/* bench without paddles (FFB_ARM_B1_ONLY): tap, tap, hold B1 */
+static void do_b1_sequence(ffb_service_t *s, uint32_t hold_ms)
+{
+  run_ms(s, 20, false, 0);
+  run_ms(s, 200, true, 0);  run_ms(s, 300, false, 0);
+  run_ms(s, 200, true, 0);  run_ms(s, 300, false, 0);
+  run_ms(s, hold_ms, true, 0);
+  run_ms(s, 20, false, 0);
+}
+
 static int count_writes(const char *prefix, int from)
 {
   int n = 0;
@@ -183,6 +193,48 @@ static void to_running(ffb_service_t *s)
 }
 
 /* ---------------- tests ---------------- */
+TEST(test_svc_b1_only_mode_arms_and_default_mode_does_not)
+{
+  ffb_service_t s;
+  ffb_service_cfg_t c = cfg_armable();
+  c.arm_b1_only = true;
+  mock_ready();
+  T = 0;
+  ffb_service_init(&s, &c, &k_io, T);
+  run_ms(&s, 10000, false, 0);                       /* background precheck: ready */
+  CHECK(ffb_service_centre_allowed(&s, T));
+  /* B1 alone, held or tapped, never arms */
+  run_ms(&s, 6000, true, 0);
+  run_ms(&s, 100, false, 0);
+  CHECK_EQ_INT(s.sm.state, FFB_STATE_DISARMED);
+  CHECK_EQ_INT(M.nwrites, 0);
+  /* during the final hold of the sequence set-centre is blocked and the gesture LED is active */
+  run_ms(&s, 20, false, 0);
+  run_ms(&s, 200, true, 0);  run_ms(&s, 300, false, 0);
+  run_ms(&s, 200, true, 0);  run_ms(&s, 300, false, 0);
+  run_ms(&s, 1500, true, 0);
+  CHECK(!ffb_service_centre_allowed(&s, T));
+  CHECK(ffb_b1seq_pending(&s.b1seq));
+  run_ms(&s, FFB_ARM_HOLD_MS, true, 0);
+  run_ms(&s, 20, false, 0);
+  run_ms(&s, 600, false, 0);
+  CHECK_EQ_INT(s.sm.state, FFB_STATE_RUNNING);
+  CHECK(count_writes("w axis0.requested_state 8", 0) >= 1);
+  /* default mode (arm_b1_only = false): the same sequence does nothing */
+  {
+    ffb_service_t s2;
+    ffb_service_cfg_t c2 = cfg_armable();
+    mock_ready();
+    T = 0;
+    ffb_service_init(&s2, &c2, &k_io, T);
+    run_ms(&s2, 10000, false, 0);
+    do_b1_sequence(&s2, FFB_ARM_HOLD_MS + 20);
+    run_ms(&s2, 600, false, 0);
+    CHECK_EQ_INT(s2.sm.state, FFB_STATE_DISARMED);
+    CHECK_EQ_INT(M.nwrites, 0);
+  }
+}
+
 TEST(test_svc_no_write_before_arm)
 {
   ffb_service_t s;
@@ -545,6 +597,7 @@ TEST(test_svc_status_report_layout)
 void run_ffb_service_tests(void)
 {
   printf("ffb service (mock ODrive)\n");
+  RUN(test_svc_b1_only_mode_arms_and_default_mode_does_not);
   RUN(test_svc_no_write_before_arm);
   RUN(test_svc_arm_not_allowed_build);
   RUN(test_svc_profile_tbd_blocks);

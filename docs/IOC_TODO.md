@@ -58,6 +58,10 @@ Label suggestion: PA9 `ODRIVE_TX` (→ ODrive GPIO2/RX), PA10 `ODRIVE_RX` (← O
 8. LEDs: LD3 heartbeat, LD7 USB configured, **LD5 (PE10, orange) = ODrive position missing/stale**,
    **LD9 (PE12, blue) toggles = centre accepted**, LD10 blinking = MCP23017 not responding.
 
+## 6a. Optional arm pins PD0 / PD1 (FFB build, off by default)
+Only with `FFB_ARM_PINS=1` does `ffb_board_init()` enable the GPIOD clock and configure PD0 / PD1 as pull-up inputs in code, so
+the `.ioc` needs nothing. The B1-only arm sequence (`WHEEL_FFB_ARM_B1_ONLY`) needs no pin at all (B1 = PA0, already used).
+
 ## 6. Force feedback build (session 2) - nothing to change in CubeMX
 - **No generated file and no middleware file was edited for FFB.** The FFB build (`-DWHEEL_FFB=ON`) uses its own
   USB class driver `Core/Src/ffb/usbd_ffb_hid.c` (same endpoints 0x81/0x01, 64 bytes, the PMA addresses already

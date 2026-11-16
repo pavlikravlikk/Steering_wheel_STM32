@@ -4,6 +4,8 @@
  */
 #include "ffb_ui.h"
 
+#include "ffb_config.h"
+
 #include <string.h>
 
 void ffb_gesture_init(ffb_gesture_t *g, uint32_t hold_ms)
@@ -52,6 +54,115 @@ ffb_gesture_event_t ffb_gesture_update(ffb_gesture_t *g, bool b1, bool paddle_l,
     g->holding = false;          /* releasing any one cancels the hold */
   }
   return ev;
+}
+
+uint16_t ffb_buttons_with_arm_pins(uint16_t buttons, bool left_pressed, bool right_pressed)
+{
+  if (left_pressed)
+  {
+    buttons = (uint16_t)(buttons | (1U << FFB_PADDLE_LEFT_BIT));
+  }
+  if (right_pressed)
+  {
+    buttons = (uint16_t)(buttons | (1U << FFB_PADDLE_RIGHT_BIT));
+  }
+  return buttons;
+}
+
+void ffb_b1seq_init(ffb_b1seq_t *q, uint32_t hold_ms)
+{
+  memset(q, 0, sizeof(*q));
+  q->hold_ms = hold_ms;
+  q->state = FFB_B1SEQ_WAIT_RELEASE;     /* must see B1 released first */
+}
+
+bool ffb_b1seq_update(ffb_b1seq_t *q, bool b1, uint32_t now_ms)
+{
+  switch (q->state)
+  {
+    case FFB_B1SEQ_WAIT_RELEASE:
+      if (!b1)
+      {
+        q->state = FFB_B1SEQ_IDLE;
+        q->taps = 0U;
+      }
+      break;
+
+    case FFB_B1SEQ_IDLE:
+      if (b1)
+      {
+        q->state = FFB_B1SEQ_DOWN;
+        q->press_ms = now_ms;
+      }
+      break;
+
+    case FFB_B1SEQ_DOWN:
+      if (!b1)
+      {                                   /* released within TAP_MAX: a tap */
+        q->taps++;
+        q->release_ms = now_ms;
+        q->state = FFB_B1SEQ_GAP;
+      }
+      else if ((now_ms - q->press_ms) > FFB_B1SEQ_TAP_MAX_MS)
+      {
+        if (q->taps == FFB_B1SEQ_TAPS)
+        {
+          q->state = FFB_B1SEQ_HOLD;      /* the final long press */
+        }
+        else
+        {
+          q->state = FFB_B1SEQ_WAIT_RELEASE;   /* long press at the wrong time */
+          q->taps = 0U;
+        }
+      }
+      break;
+
+    case FFB_B1SEQ_GAP:
+      if (b1)
+      {
+        if ((now_ms - q->release_ms) <= FFB_B1SEQ_GAP_MAX_MS)
+        {
+          q->state = FFB_B1SEQ_DOWN;
+          q->press_ms = now_ms;
+        }
+        else
+        {                                 /* too slow: this press starts a new sequence */
+          q->taps = 0U;
+          q->state = FFB_B1SEQ_DOWN;
+          q->press_ms = now_ms;
+        }
+      }
+      else if ((now_ms - q->release_ms) > FFB_B1SEQ_GAP_MAX_MS)
+      {
+        q->state = FFB_B1SEQ_IDLE;
+        q->taps = 0U;
+      }
+      break;
+
+    case FFB_B1SEQ_HOLD:
+      if (!b1)
+      {
+        q->state = FFB_B1SEQ_IDLE;        /* released early: cancel */
+        q->taps = 0U;
+      }
+      else if ((now_ms - q->press_ms) >= q->hold_ms)
+      {
+        q->state = FFB_B1SEQ_WAIT_RELEASE;
+        q->taps = 0U;
+        return true;                      /* fires once; the next arm needs a release */
+      }
+      break;
+
+    default:
+      q->state = FFB_B1SEQ_WAIT_RELEASE;
+      break;
+  }
+  return false;
+}
+
+bool ffb_b1seq_pending(const ffb_b1seq_t *q)
+{
+  return q->state == FFB_B1SEQ_HOLD;
 }
 
 bool ffb_gesture_active(const ffb_gesture_t *g)

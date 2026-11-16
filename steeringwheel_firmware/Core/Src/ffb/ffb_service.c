@@ -37,6 +37,7 @@ void ffb_service_default_cfg(ffb_service_cfg_t *cfg)
   cfg->period_ms = FFB_COMMAND_PERIOD_MS;
   cfg->stale_ms = FFB_STALE_MS;
   cfg->arm_hold_ms = FFB_ARM_HOLD_MS;
+  cfg->arm_b1_only = (FFB_ARM_B1_ONLY != 0);
 }
 
 void ffb_service_init(ffb_service_t *s, const ffb_service_cfg_t *cfg, const ffb_io_t *io,
@@ -54,6 +55,7 @@ void ffb_service_init(ffb_service_t *s, const ffb_service_cfg_t *cfg, const ffb_
   ffb_torque_default_cfg(&s->tcfg);
   ffb_torque_reset(&s->tst);
   ffb_gesture_init(&s->gesture, cfg->arm_hold_ms);
+  ffb_b1seq_init(&s->b1seq, cfg->arm_hold_ms);
   s->bg_reason = FFB_REASON_NOT_CHECKED_YET;
   s->actuators_enabled = true;
   s->last_cycle_ms = now_ms;
@@ -71,6 +73,10 @@ void ffb_service_buttons(ffb_service_t *s, bool b1, uint16_t buttons, uint32_t n
     case FFB_GESTURE_ARM:    s->arm_event = true;    break;
     case FFB_GESTURE_DISARM: s->disarm_event = true; break;
     default: break;
+  }
+  if (s->cfg.arm_b1_only && ffb_b1seq_update(&s->b1seq, b1, now_ms))
+  {
+    s->arm_event = true;         /* tap, tap, hold B1 (bench without paddles) */
   }
 }
 
@@ -406,7 +412,7 @@ void ffb_service_poll(ffb_service_t *s, uint32_t now_ms)
 
 bool ffb_service_centre_allowed(const ffb_service_t *s, uint32_t now_ms)
 {
-  return (s->sm.state == FFB_STATE_DISARMED) && !s->paddles_held
+  return (s->sm.state == FFB_STATE_DISARMED) && !s->paddles_held && !ffb_b1seq_pending(&s->b1seq)
       && ((now_ms - s->sm.last_disarm_ms) >= FFB_CENTRE_LOCKOUT_MS);
 }
 
@@ -419,7 +425,7 @@ uint8_t ffb_service_leds(const ffb_service_t *s, uint32_t now_ms)
 {
   const ffb_reason_t r = (s->sm.state == FFB_STATE_DISARMED) ? s->bg_reason : s->sm.reason;
   return ffb_led_pattern(s->sm.state, r, s->sm.fault, s->bg_reason == FFB_REASON_OK,
-                         ffb_gesture_active(&s->gesture), now_ms);
+                         ffb_gesture_active(&s->gesture) || ffb_b1seq_pending(&s->b1seq), now_ms);
 }
 
 static void put16(uint8_t *p, uint32_t v)
@@ -441,7 +447,7 @@ void ffb_service_status_report(const ffb_service_t *s, uint8_t out[FFB_STATUS_RE
   if (s->cfg.profile_safety_tbd == 0U)  flags |= FFB_FLAG_PROFILE_MEASURED;
   if (s->host_active)                   flags |= FFB_FLAG_HOST_EFFECTS;
   if (s->actuators_enabled)             flags |= FFB_FLAG_ACTUATORS_ENABLED;
-  if (ffb_gesture_active(&s->gesture))  flags |= FFB_FLAG_GESTURE_ACTIVE;
+  if (ffb_gesture_active(&s->gesture) || ffb_b1seq_pending(&s->b1seq))  flags |= FFB_FLAG_GESTURE_ACTIVE;
   if (ma > 32767)  ma = 32767;
   if (ma < -32768) ma = -32768;
   out[0] = FFB_STATUS_REPORT_ID;

@@ -218,3 +218,12 @@ Full table: `docs/DUMP_RECONCILIATION.md`. Decisions:
   dump at the next ODrive power-up**. No code depends on the stale lines: the tools report whatever a dump says, and the
   tests use those values only as a realistic "flags on / errors present" case. The `axis must be IDLE` pre-arm check
   (NOT_IDLE) stays as an independent guard. The contradiction note in `hardware.md` was replaced by this explanation.
+
+## 2026-11-16 - arm gesture without paddle buttons (owner decision)
+- The owner has no MCP23017 and no buttons, so the FFB could never arm (gesture = B1 + both paddles). New build option
+  `-DWHEEL_FFB_ARM_B1_ONLY=1` (`FFB_ARM_B1_ONLY`, default 0): B1 alone arms with **tap, tap, hold 3 s** (`ffb_b1seq_*`). — only
+  hardware that exists — weaker than three buttons (one button, on the board, not on the wheel), so it is opt-in, documented
+  for F4-F7 with the wheel DISMOUNTED only, and the default build keeps the 3-button gesture. Fail-safe properties are unit
+  tested (stuck B1, one tap, three taps, slow gaps, long taps, early release, no repeat, centre blocked during the hold).
+- Also added, off by default: `FFB_ARM_PINS=1` makes two push buttons on PD0 / PD1 (to GND) count as the paddles.
+- Rejected: arming with a single long B1 press (an accidental or stuck press would be enough).

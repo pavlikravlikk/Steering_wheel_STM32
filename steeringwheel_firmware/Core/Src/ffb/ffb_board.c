@@ -8,6 +8,7 @@
 #include "ffb_config.h"
 #include "ffb_pid.h"
 #include "ffb_service.h"
+#include "ffb_ui.h"
 #include "main.h"
 #include "odrive_link.h"
 #include "odrive_uart.h"
@@ -80,6 +81,17 @@ void ffb_board_init(void)
   DWT->CYCCNT = 0U;
   DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;
 
+#if FFB_ARM_PINS
+  /* PD0 / PD1: arm buttons to GND, internal pull-up (released = high = not pressed; an unplugged wire
+   * reads "released", so it can never arm). Not configured in CubeMX (.ioc untouched). */
+  __HAL_RCC_GPIOD_CLK_ENABLE();
+  GPIO_InitTypeDef arm_gpio = {0};
+  arm_gpio.Pin = GPIO_PIN_0 | GPIO_PIN_1;
+  arm_gpio.Mode = GPIO_MODE_INPUT;
+  arm_gpio.Pull = GPIO_PULLUP;
+  HAL_GPIO_Init(GPIOD, &arm_gpio);
+#endif
+
   ffb_pid_init();
   usbd_ffb_install(&hUsbDeviceFS);      /* HID PID class instead of CustomHID */
 
@@ -113,6 +125,11 @@ void ffb_board_poll(uint32_t now_ms)
 
 void ffb_board_buttons(uint32_t now_ms, bool b1, uint16_t buttons)
 {
+#if FFB_ARM_PINS
+  buttons = ffb_buttons_with_arm_pins(buttons,
+                                      HAL_GPIO_ReadPin(GPIOD, GPIO_PIN_0) == GPIO_PIN_RESET,
+                                      HAL_GPIO_ReadPin(GPIOD, GPIO_PIN_1) == GPIO_PIN_RESET);
+#endif
   ffb_service_buttons(&s_ffb, b1, buttons, now_ms);
 }
 

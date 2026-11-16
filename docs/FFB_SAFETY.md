@@ -41,6 +41,18 @@ All of these, in this order:
 4. **Arm gesture:** hold **B1 (blue) + left paddle + right paddle** together for 3 s
    (`ffb.arm_hold_ms`). All three must first have been released (a stuck button at power-up
    cannot arm). Releasing any of them cancels.
+   **Bench WITHOUT paddle buttons (2026-11-16, owner decision):** build with `-DWHEEL_FFB_ARM_B1_ONLY=1`
+   (default 0). Then **B1 alone** can arm with a deliberate sequence: **tap B1 twice** (each press shorter than
+   0.6 s, gap between presses under 1.5 s), then **press B1 a third time and HOLD it for 3 s** (LD4 blinks fast during
+   the hold). Fail-safe parts: B1 must be seen released first (held at power-up = never arms); exactly two taps
+   (one, three, too-slow or too-long taps never arm); releasing early cancels; fires once, the next arm starts over;
+   set-centre is blocked during the final hold. All the other arming conditions (precheck, watchdog, limits...) are
+   unchanged. **This is weaker than B1 + both paddles** (one button, on the controller board): use it only for the first
+   tests with the steering wheel DISMOUNTED (F4-F7), and rebuild with the default (3-button gesture, add paddle
+   buttons) before the wheel is mounted (F8). Code: `ffb_b1seq_*` in `ffb_ui.c`, tests `test_b1seq_*` and
+   `test_svc_b1_only_mode_*`.
+   Optional (off by default, `FFB_ARM_PINS=1` through `-DWHEEL_EXTRA_DEFINES=FFB_ARM_PINS=1`): two push buttons PD0 / PD1
+   to GND act as the two paddles (`ffb_buttons_with_arm_pins()`); nothing is configured on those pins unless enabled.
 5. **Precheck** (read-only, all values re-read after the gesture, within 2 s):
    `axis0.config.enable_watchdog` = True; `watchdog_timeout` inside
    [`ffb.watchdog_timeout_min_s`, `ffb.watchdog_timeout_max_s`];
@@ -157,8 +169,9 @@ Keep a hand on the 24 V switch for every F-step. Stop at the first surprise.
   `odrv0.axis0.requested_state = 8`, do not feed -> within `watchdog_timeout` the axis must
   go to IDLE with WATCHDOG_TIMER_EXPIRED. If it does not, **do not continue**.
 - **F5 First arm, wheel DISMOUNTED, gains small:** in the profile set `ffb.max_amps = 0.3`,
-  `ffb.spring_kp_amps_per_turn = 0.2`, rebuild with `-DWHEEL_FFB=ON -DWHEEL_FFB_ARM_ALLOWED=1`,
-  flash, power the ODrive, do the gesture. Expect LD6 fast blink then solid. Turn the rotor
+  `ffb.spring_kp_amps_per_turn = 0.2`, rebuild with `-DWHEEL_FFB=ON -DWHEEL_FFB_ARM_ALLOWED=1`
+  (without paddle buttons add `-DWHEEL_FFB_ARM_B1_ONLY=1`, section 3),
+  flash, power the ODrive, do the gesture (B1 only: tap, tap, hold 3 s). Expect LD6 fast blink then solid. Turn the rotor
   by hand: it must pull back towards centre (gently). If it pushes away, the sign is wrong:
   press B1, power off, investigate (encoder direction / calibration) - do not "fix" it by
   flipping signs blindly.

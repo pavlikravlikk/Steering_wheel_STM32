@@ -88,6 +88,24 @@
 #define FFB_PRECHECK_MAX_AGE_MS         1500U  /* precheck values younger than   */
 #define FFB_CENTRE_LOCKOUT_MS           2000U  /* no set-centre right after disarm*/
 
+/* 1 = two push buttons PD0 (left) and PD1 (right), each between the pin and GND (internal pull-up, active low),
+ * count as the left / right paddle of the arm gesture. Lets the FFB arm without an MCP23017 board. The pins
+ * are read only for the gesture, they are not HID buttons. 0 = only the MCP23017 paddles (HID 9 / 10). */
+#ifndef FFB_ARM_PINS
+#define FFB_ARM_PINS                    0   /* opt-in: -DWHEEL_EXTRA_DEFINES=FFB_ARM_PINS=1 */
+#endif
+
+/* 1 = BENCH WITHOUT PADDLE BUTTONS: the board button B1 alone can arm, with a deliberate sequence: two short
+ * taps (each <= FFB_B1SEQ_TAP_MAX_MS, gaps <= FFB_B1SEQ_GAP_MAX_MS) and then HOLD B1 for FFB_ARM_HOLD_MS.
+ * Weaker than B1 + both paddles (one button, on the controller board): use it only for the first tests with the
+ * steering wheel DISMOUNTED, go back to 0 (default) before the wheel is mounted. */
+#ifndef FFB_ARM_B1_ONLY
+#define FFB_ARM_B1_ONLY                 0
+#endif
+#define FFB_B1SEQ_TAPS                  2U
+#define FFB_B1SEQ_TAP_MAX_MS            600U
+#define FFB_B1SEQ_GAP_MAX_MS            1500U
+
 /* Button bits (HID buttons 9 and 10 = left / right paddle). */
 #define FFB_PADDLE_LEFT_BIT             8U
 #define FFB_PADDLE_RIGHT_BIT            9U

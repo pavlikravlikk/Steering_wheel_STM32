@@ -165,6 +165,7 @@ and `pins.i2c` `measured`.
 ---
 
 ## F. Force feedback (only after H0-H9, and only with the owner's decision)
+Arm gesture without paddle buttons: build with `-DWHEEL_FFB_ARM_B1_ONLY=1` (B1: tap, tap, hold 3 s; weaker, wheel dismounted only), see `docs/FFB_SAFETY.md` section 3.
 Everything about FFB is in **`docs/FFB_SAFETY.md`**: the safety case, what is and what is NOT
 protected, the mandatory order (F1 ... F8: wheel dismounted, low current, hand on the power
 plug) and the exact build flags (`-DWHEEL_FFB=ON -DWHEEL_FFB_ARM_ALLOWED=1`).

@@ -69,6 +69,7 @@ typedef struct
   uint32_t period_ms;          /* FFB_COMMAND_PERIOD_MS                     */
   uint32_t stale_ms;           /* FFB_STALE_MS                              */
   uint32_t arm_hold_ms;        /* FFB_ARM_HOLD_MS                           */
+  bool     arm_b1_only;        /* FFB_ARM_B1_ONLY: tap, tap, hold B1 can arm */
 } ffb_service_cfg_t;
 
 typedef struct
@@ -81,6 +82,7 @@ typedef struct
   ffb_torque_cfg_t   tcfg;
   ffb_torque_state_t tst;
   ffb_gesture_t      gesture;
+  ffb_b1seq_t        b1seq;            /* only used when cfg.arm_b1_only        */
 
   bool          arm_event;          /* latched by ffb_service_buttons()      */
   bool          disarm_event;

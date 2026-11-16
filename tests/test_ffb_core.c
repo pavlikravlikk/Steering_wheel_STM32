@@ -796,6 +796,131 @@ TEST(test_gesture_needs_release_first_and_full_hold)
   CHECK_EQ_INT(arms, 1);
 }
 
+TEST(test_arm_pins_merge_into_paddle_bits)
+{
+  CHECK_EQ_INT(ffb_buttons_with_arm_pins(0x0000, false, false), 0x0000);
+  CHECK_EQ_INT(ffb_buttons_with_arm_pins(0x0000, true, false), 1U << FFB_PADDLE_LEFT_BIT);
+  CHECK_EQ_INT(ffb_buttons_with_arm_pins(0x0000, false, true), 1U << FFB_PADDLE_RIGHT_BIT);
+  CHECK_EQ_INT(ffb_buttons_with_arm_pins(0x0000, true, true),
+               (1U << FFB_PADDLE_LEFT_BIT) | (1U << FFB_PADDLE_RIGHT_BIT));
+  CHECK_EQ_INT(ffb_buttons_with_arm_pins(0x0003, true, true) & 0x0003U, 0x0003);   /* other bits kept */
+  CHECK_EQ_INT(ffb_buttons_with_arm_pins(0x0300, false, false), 0x0300);           /* MCP paddles still count */
+  CHECK_EQ_INT(ffb_buttons_with_arm_pins(0x8000, true, true) & 0x8000U, 0x8000);
+}
+
+TEST(test_arm_pins_gesture_end_to_end_and_fail_safe)
+{
+  ffb_gesture_t g;
+  uint32_t t = 0;
+  int arms = 0;
+  ffb_gesture_init(&g, 3000);
+  /* Both pin buttons stuck pressed from power-up + B1: can never arm. */
+  for (; t < 8000; t++)
+  {
+    const uint16_t b = ffb_buttons_with_arm_pins(0, true, true);
+    if (ffb_gesture_update(&g, true, (b >> FFB_PADDLE_LEFT_BIT) & 1U, (b >> FFB_PADDLE_RIGHT_BIT) & 1U, t) == FFB_GESTURE_ARM) arms++;
+  }
+  CHECK_EQ_INT(arms, 0);
+  /* Release everything, then press B1 + both pins for 3 s: arms once. */
+  ffb_gesture_update(&g, false, false, false, t++);
+  for (uint32_t k = 0; k < 3100; k++, t++)
+  {
+    const uint16_t b = ffb_buttons_with_arm_pins(0, true, true);
+    if (ffb_gesture_update(&g, true, (b >> FFB_PADDLE_LEFT_BIT) & 1U, (b >> FFB_PADDLE_RIGHT_BIT) & 1U, t) == FFB_GESTURE_ARM) arms++;
+  }
+  CHECK_EQ_INT(arms, 1);
+  /* Only one pin button (the other wire unplugged = released): no arm. */
+  ffb_gesture_update(&g, false, false, false, t++);
+  for (uint32_t k = 0; k < 8000; k++, t++)
+  {
+    const uint16_t b = ffb_buttons_with_arm_pins(0, true, false);
+    if (ffb_gesture_update(&g, true, (b >> FFB_PADDLE_LEFT_BIT) & 1U, (b >> FFB_PADDLE_RIGHT_BIT) & 1U, t) == FFB_GESTURE_ARM) arms++;
+  }
+  CHECK_EQ_INT(arms, 1);
+}
+
+/* B1-only arm sequence: tap, tap, hold. Helper: hold B1 in the given state for ms. */
+static uint32_t b1s_run(ffb_b1seq_t *q, uint32_t *t, bool b1, uint32_t ms, int *fires)
+{
+  for (uint32_t k = 0; k < ms; k++, (*t)++)
+  {
+    if (ffb_b1seq_update(q, b1, *t)) (*fires)++;
+  }
+  return *t;
+}
+
+TEST(test_b1seq_tap_tap_hold_arms_once)
+{
+  ffb_b1seq_t q;
+  uint32_t t = 0;
+  int fires = 0;
+  ffb_b1seq_init(&q, 3000);
+  b1s_run(&q, &t, false, 50, &fires);
+  b1s_run(&q, &t, true, 200, &fires);  b1s_run(&q, &t, false, 300, &fires);
+  b1s_run(&q, &t, true, 200, &fires);  b1s_run(&q, &t, false, 300, &fires);
+  b1s_run(&q, &t, true, 1000, &fires);
+  CHECK(ffb_b1seq_pending(&q));                    /* final hold running */
+  CHECK_EQ_INT(fires, 0);
+  b1s_run(&q, &t, true, 2100, &fires);             /* total 3.1 s held */
+  CHECK_EQ_INT(fires, 1);
+  CHECK(!ffb_b1seq_pending(&q));
+  b1s_run(&q, &t, true, 10000, &fires);            /* keeps holding: no second arm */
+  CHECK_EQ_INT(fires, 1);
+  /* the next arm needs a full release and the whole sequence again */
+  b1s_run(&q, &t, false, 100, &fires);
+  b1s_run(&q, &t, true, 5000, &fires);
+  CHECK_EQ_INT(fires, 1);
+}
+
+TEST(test_b1seq_rejects_everything_else)
+{
+  ffb_b1seq_t q;
+  uint32_t t = 0;
+  int fires = 0;
+  /* B1 simply held for a long time (also held from power-up): never arms */
+  ffb_b1seq_init(&q, 3000);
+  b1s_run(&q, &t, true, 20000, &fires);
+  CHECK_EQ_INT(fires, 0);
+  b1s_run(&q, &t, false, 50, &fires);
+  b1s_run(&q, &t, true, 20000, &fires);
+  CHECK_EQ_INT(fires, 0);
+  /* one tap then hold */
+  ffb_b1seq_init(&q, 3000); t = 0;
+  b1s_run(&q, &t, false, 50, &fires);
+  b1s_run(&q, &t, true, 200, &fires);  b1s_run(&q, &t, false, 300, &fires);
+  b1s_run(&q, &t, true, 6000, &fires);
+  CHECK_EQ_INT(fires, 0);
+  /* two taps, gap too long, then hold */
+  ffb_b1seq_init(&q, 3000); t = 0;
+  b1s_run(&q, &t, false, 50, &fires);
+  b1s_run(&q, &t, true, 200, &fires);  b1s_run(&q, &t, false, 300, &fires);
+  b1s_run(&q, &t, true, 200, &fires);  b1s_run(&q, &t, false, 2000, &fires);
+  b1s_run(&q, &t, true, 6000, &fires);
+  CHECK_EQ_INT(fires, 0);
+  /* three taps then hold */
+  ffb_b1seq_init(&q, 3000); t = 0;
+  b1s_run(&q, &t, false, 50, &fires);
+  for (int i = 0; i < 3; i++) { b1s_run(&q, &t, true, 200, &fires); b1s_run(&q, &t, false, 300, &fires); }
+  b1s_run(&q, &t, true, 6000, &fires);
+  CHECK_EQ_INT(fires, 0);
+  /* a "tap" that is too long, twice, then hold */
+  ffb_b1seq_init(&q, 3000); t = 0;
+  b1s_run(&q, &t, false, 50, &fires);
+  b1s_run(&q, &t, true, 900, &fires);  b1s_run(&q, &t, false, 300, &fires);
+  b1s_run(&q, &t, true, 900, &fires);  b1s_run(&q, &t, false, 300, &fires);
+  b1s_run(&q, &t, true, 6000, &fires);
+  CHECK_EQ_INT(fires, 0);
+  /* final hold released early, then a lone short press: nothing */
+  ffb_b1seq_init(&q, 3000); t = 0;
+  b1s_run(&q, &t, false, 50, &fires);
+  b1s_run(&q, &t, true, 200, &fires);  b1s_run(&q, &t, false, 300, &fires);
+  b1s_run(&q, &t, true, 200, &fires);  b1s_run(&q, &t, false, 300, &fires);
+  b1s_run(&q, &t, true, 2900, &fires);
+  b1s_run(&q, &t, false, 50, &fires);
+  b1s_run(&q, &t, true, 500, &fires);
+  CHECK_EQ_INT(fires, 0);
+}
+
 TEST(test_gesture_disarm_on_b1_press)
 {
   ffb_gesture_t g;
@@ -862,6 +987,10 @@ void run_ffb_core_tests(void)
   RUN(test_torque_units_with_several_kt);
   RUN(test_torque_fuzz_always_bounded);
   RUN(test_gesture_needs_release_first_and_full_hold);
+  RUN(test_arm_pins_merge_into_paddle_bits);
+  RUN(test_arm_pins_gesture_end_to_end_and_fail_safe);
+  RUN(test_b1seq_tap_tap_hold_arms_once);
+  RUN(test_b1seq_rejects_everything_else);
   RUN(test_gesture_disarm_on_b1_press);
   RUN(test_led_patterns);
 }

@@ -125,6 +125,10 @@ option(SIMULATE_INPUTS "Generate simulated inputs instead of reading hardware" O
 option(WHEEL_FFB "Build the force-feedback module (can command the motor)" OFF)
 set(WHEEL_FFB_ARM_ALLOWED "0" CACHE STRING "1 = FFB may arm the motor (needs WHEEL_FFB=ON)")
 set_property(CACHE WHEEL_FFB_ARM_ALLOWED PROPERTY STRINGS 0 1)
+#   -DWHEEL_FFB_ARM_B1_ONLY=1       bench WITHOUT paddle buttons: B1 alone arms with tap, tap, hold
+#                                   (weaker gesture; first tests with the wheel dismounted only).
+set(WHEEL_FFB_ARM_B1_ONLY "0" CACHE STRING "1 = arm with B1 only (tap, tap, hold); weaker, needs WHEEL_FFB=ON")
+set_property(CACHE WHEEL_FFB_ARM_B1_ONLY PROPERTY STRINGS 0 1)
 
 #   -DWHEEL_EXTRA_DEFINES="A=1;B=2"  extra macros, e.g. the optional features
 #                                   IWDG_ENABLE, RESET_REASON_LED, AXIS_SHAPING_ENABLE,
@@ -136,13 +140,15 @@ if(SIMULATE_INPUTS)
     list(APPEND WHEEL_DEFINES SIMULATE_INPUTS=1)
 endif()
 if(WHEEL_FFB)
-    list(APPEND WHEEL_DEFINES WHEEL_FFB=1 WHEEL_FFB_ARM_ALLOWED=${WHEEL_FFB_ARM_ALLOWED})
+    list(APPEND WHEEL_DEFINES WHEEL_FFB=1 WHEEL_FFB_ARM_ALLOWED=${WHEEL_FFB_ARM_ALLOWED} FFB_ARM_B1_ONLY=${WHEEL_FFB_ARM_B1_ONLY})
     target_sources(${CMAKE_PROJECT_NAME} PRIVATE ${WHEEL_FFB_SOURCES})
     set_source_files_properties(${WHEEL_FFB_SOURCES} PROPERTIES COMPILE_OPTIONS "-Wall;-Wextra")
     target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE Core/Inc/ffb)
-    message(STATUS "WHEEL_FFB=ON (WHEEL_FFB_ARM_ALLOWED=${WHEEL_FFB_ARM_ALLOWED})")
+    message(STATUS "WHEEL_FFB=ON (WHEEL_FFB_ARM_ALLOWED=${WHEEL_FFB_ARM_ALLOWED}, WHEEL_FFB_ARM_B1_ONLY=${WHEEL_FFB_ARM_B1_ONLY})")
 elseif(NOT WHEEL_FFB_ARM_ALLOWED STREQUAL "0")
     message(FATAL_ERROR "WHEEL_FFB_ARM_ALLOWED needs WHEEL_FFB=ON")
+elseif(NOT WHEEL_FFB_ARM_B1_ONLY STREQUAL "0")
+    message(FATAL_ERROR "WHEEL_FFB_ARM_B1_ONLY needs WHEEL_FFB=ON")
 endif()
 
 # Hardware profile -> Core/Inc/wheel_config_generated.h. The generated file is
