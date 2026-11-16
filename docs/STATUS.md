@@ -3,7 +3,8 @@
 ## Reconciliation with the real ODrive dump
 - `docs/hardware.md` and the real `docs/odrive_dump.txt` were added by the owner; everything was re-checked:
   `docs/DUMP_RECONCILIATION.md` (mismatches: regen limit -3.0 A not -0.01 A, `enable_current_mode_vel_limit`
-  name, UART names, no brake enable switch, startup flags True in the dump, three active error bits).
+  name, UART names, no brake enable switch). The dump predates the owner's startup-flag change (flags are saved False,
+  verified after a power cycle, which also cleared the three errors it shows): replace it at the next ODrive power-up.
 - Tests now use the real dump (Python + `tests/test_ffb_dump.c`); new pre-arm condition `NOT_IDLE`.
 
 # Status (end of session 2, 2026-11-16)
@@ -36,8 +37,8 @@ build with 0 warnings; default binary has no write token; 17/17 mutations killed
 - Nothing was run on hardware: no flashing, no USB enumeration, no ODrive. The FFB code and the generated
   ODrive scripts have never touched a real device.
 - Open questions (TODO(TBD)): watchdog in IDLE (F3), ASCII `u 0` and boolean format in this dev build,
-  game-force direction, brake resistor hardware / regen limits, the startup-flag contradiction
-  (dump True vs hardware.md False), every profile value.
+  game-force direction, brake resistor hardware / regen limits, a fresh ODrive dump (the committed one is
+  stale for the startup flags and errors), every profile value.
 
 ## Generated status
 <!-- BEGIN GENERATED: tools/project_status.py -->

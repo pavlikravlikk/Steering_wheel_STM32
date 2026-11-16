@@ -59,11 +59,11 @@ Failure: `lsusb -d 0483:5752` empty -> USB cable on the wrong connector (ST-LINK
    reference for the real parameter names (`docs/DUMP_RECONCILIATION.md`). Save a fresh one
    (`--dump-out`) after every configuration change; the generated scripts skip names that do
    not exist on your build.
-4. Known from that dump: `axis0.error` 0x100 ENCODER_FAILED, `motor.error` 0x10
-   CONTROL_DEADLINE_MISSED, `encoder.error` 0x4 NO_RESPONSE (expected: no belt, so the startup
-   offset calibration fails), and **`startup_closed_loop_control` / `startup_encoder_offset_calibration`
-   = True in the dump** although `docs/hardware.md` says they were saved False. Re-check them
-   first; they must be False.
+4. The committed dump predates the owner's startup-flag change: it still shows both startup
+   flags True and three errors (axis 0x100, motor 0x10, encoder 0x4) that the power cycle
+   cleared. The flags are saved False (verified, `docs/hardware.md` line 30). **At the next ODrive
+   power-up, make a fresh dump and replace `docs/odrive_dump.txt`** (never edit it by hand); then
+   `python3 tools/odrive_status.py` must show the flags False and no errors.
 
 Success: errors `0x0`, `current_state = 1 (IDLE)`, all startup flags `False`. Many `DIFF`
 lines are expected now (factory limits); `FFB precheck would FAIL` is expected.

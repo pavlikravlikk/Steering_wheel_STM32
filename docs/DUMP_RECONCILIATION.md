@@ -1,5 +1,11 @@
 # Reconciliation: our assumptions vs the real ODrive dump
 
+> **The dump is stale for the startup flags and the error registers.** It was taken BEFORE the owner saved
+> `startup_closed_loop_control` and `startup_encoder_offset_calibration` as False (verified after a power cycle,
+> `docs/hardware.md` line 30); that power cycle also cleared the three active errors. Replace
+> `docs/odrive_dump.txt` with a fresh dump at the next ODrive power-up (never edit it by hand). Names, types and
+> all other values are unaffected.
+
 Source of truth: `docs/odrive_dump.txt` (odrivetool 0.5.4 session on the bench board, 2026-11-16;
 hw 3.6 variant 56, fw 0.0.0 "unreleased", early 0.5.x / 0.5.1-like API). Paths are relative to `odrv0`.
 "Where used": FW = firmware (`Core/Src/ffb/ffb_precheck.c`, `ffb_cmd.c`), SET = generated
@@ -20,8 +26,8 @@ exists; dry-run diff against the dump).
 | `config.enable_uart_a`, `config.uart_a_baudrate`, `config.uart0_protocol` | DOC, BENCH_CHECKLIST, HARDWARE_BRINGUP | possible names | **do not exist**; `config.enable_uart: True`, `config.uart_baudrate: 115200` | DOC reads the real names (old ones only as optional fallbacks); docs fixed; `uart.baud` -> measured |
 | `config.enable_brake_resistor` | DOC, PROF text | may exist | **does not exist**; `brake_resistor_armed: True`, `config.brake_resistance: 2.0` | Removed from reads; brake values are new check-only profile entries |
 | device-level `error` | DOC, setup/cal scripts | may exist (0.5.2+) | **does not exist** (early API) | Read only if present; doctor prints "(not in dump)" |
-| `axis0.config.startup_closed_loop_control`, `startup_encoder_offset_calibration` | DOC, SET, docs/hardware.md | False (hardware.md line 30) | **True** (dump lines 165, 167) | Reported as ERROR by DOC; SET would set False; new FW pre-arm check `current_state == IDLE` (NOT_IDLE); contradiction noted in hardware.md |
-| Error registers | DOC, FW precheck | 0 | `axis0.error` 256 = ENCODER_FAILED, `motor.error` 16 = CONTROL_DEADLINE_MISSED, `encoder.error` 4 = NO_RESPONSE | Decoded by DOC; FW precheck/monitor refuse (tested with the real values) |
+| `axis0.config.startup_closed_loop_control`, `startup_encoder_offset_calibration` | DOC, SET, docs/hardware.md | False (hardware.md line 30) | True (dump lines 165, 167) - **stale: the dump predates the owner's change; False is saved and verified after a power cycle** | No code change needed; the tools report whatever a dump says (a fresh dump will show False); new FW pre-arm check `current_state == IDLE` (NOT_IDLE) kept as an independent guard |
+| Error registers | DOC, FW precheck | 0 | `axis0.error` 256 = ENCODER_FAILED, `motor.error` 16 = CONTROL_DEADLINE_MISSED, `encoder.error` 4 = NO_RESPONSE - **stale: cleared by the owner's power cycle** | Decoded by DOC; FW precheck/monitor refuse such values (tested with these dump values as a realistic error case) |
 | `axis0.current_state` path | FW (`FFB_VERIFY_CLOSED_LOOP`) | TODO(TBD) | exists, int32, 1 | TBD resolved; now also a pre-arm condition |
 | Dump format | DOC `--fixture` | flat or `name = value` tree | IPython session, `name: value (type)`, `name: ...`, methods | New parser `tools/odrive_dump.py`, robust + problem reporting |
 | Motor error 0.5.1 bits | `odrive_enums.py` | 0.5.6 table only | early API -> 0.5.1 bits possible | Added legacy names for bits the 0.5.6 table lacks, marked unverified |
@@ -72,5 +78,6 @@ exists; dry-run diff against the dump).
 - Whether the watchdog is checked while IDLE (bring-up F3), whether ASCII `u 0` exists in this dev build,
   how `r` prints booleans over UART (parser accepts `0/1` and `True/False`).
 - The brake resistor hardware (presence, value, power rating) and the right regen limits.
-- The startup-flag contradiction (dump: True, hardware.md: False after a power cycle).
+- A fresh dump at the next ODrive power-up (the committed one predates the startup-flag change and still shows
+  the cleared errors).
 - Error-bit names outside the ones present in the dump.

@@ -210,3 +210,10 @@ Full table: `docs/DUMP_RECONCILIATION.md`. Decisions:
   (human decision).
 - `motor.config.direction = -1` and `encoder.config.offset = -9298` are stale results of an earlier calibration; they are
   rewritten by the next encoder offset calibration. Nothing in our code writes them.
+- **Correction (owner, 2026-11-16): the dump is stale for the startup flags and the errors.** `docs/odrive_dump.txt` was
+  taken BEFORE the owner saved `startup_closed_loop_control` and `startup_encoder_offset_calibration` as False (verified
+  after a power cycle; `docs/hardware.md` line 30 is correct). The same power cycle cleared the three active errors the
+  dump shows (axis 0x100, motor 0x10, encoder 0x4). The dump is **not edited by hand**; it must be **replaced by a fresh
+  dump at the next ODrive power-up**. No code depends on the stale lines: the tools report whatever a dump says, and the
+  tests use those values only as a realistic "flags on / errors present" case. The `axis must be IDLE` pre-arm check
+  (NOT_IDLE) stays as an independent guard. The contradiction note in `hardware.md` was replaced by this explanation.
