@@ -178,7 +178,7 @@ class TestAnalyseRealDump(unittest.TestCase):
                      "watchdog_timeout", "dc_bus_overvoltage_trip_level", "dc_max_positive_current",
                      "calibration_current", "startup_closed_loop_control"):
             self.assertIn(path, diffs)
-        self.assertNotIn("dc_max_negative_current", diffs)     # profile now = saved -3.0
+        self.assertIn("dc_max_negative_current", diffs)        # profile -1.5 A (50 W resistor) vs saved -3.0
         self.assertNotIn("brake_resistance", diffs)
         errors = "\n".join(t for lvl, t in lines if lvl == "ERROR")
         self.assertIn("ENCODER_FAILED", errors)

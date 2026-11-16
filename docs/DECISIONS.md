@@ -219,6 +219,18 @@ Full table: `docs/DUMP_RECONCILIATION.md`. Decisions:
   tests use those values only as a realistic "flags on / errors present" case. The `axis must be IDLE` pre-arm check
   (NOT_IDLE) stays as an independent guard. The contradiction note in `hardware.md` was replaced by this explanation.
 
+## 2026-11-16 - rotation limit and H6 numbers
+- **New pre-arm reason 21 `WHEEL_OUT_OF_RANGE`**: the service passes the current wheel angle to the precheck context
+  (`wheel_in_range`); arming is refused while `|angle| > lock/2`, so the end-stop wall never starts under the wheel. Checked
+  right after `POSITION_STALE`. Unit tests (core + service) and a mutation test. It does NOT replace a mechanical stop
+  (documented in `docs/FFB_SAFETY.md` section 5).
+- **`odrive.dc_max_negative_current` -3.0 -> -1.5 A** (status still TBD): the brake resistor on AUX is 50 W / 2 ohm and the
+  profile never allows regen into the PSU, so -3 A at 24-30 V is a 70-90 W peak. `odrive_setup.py` will now write it
+  (14 changes against the old dump).
+- **`odrive.torque_constant` 0.04 -> 0.5**: the live ODrive reads 0.5, and 8.27/KV (KV about 16) is about 0.52 Nm/A. The firmware
+  converts amps to torque with the READ value and the ODrive converts back with the same constant, so the commanded current does
+  not depend on it.
+
 ## 2026-11-16 - arm gesture without paddle buttons (owner decision)
 - The owner has no MCP23017 and no buttons, so the FFB could never arm (gesture = B1 + both paddles). New build option
   `-DWHEEL_FFB_ARM_B1_ONLY=1` (`FFB_ARM_B1_ONLY`, default 0): B1 alone arms with **tap, tap, hold 3 s** (`ffb_b1seq_*`). — only

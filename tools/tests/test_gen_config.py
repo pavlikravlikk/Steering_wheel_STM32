@@ -195,11 +195,12 @@ class TestSetupScript(unittest.TestCase):
         self.assertRegex(out, r"axis0\.motor\.config\.current_lim\s+12\.0\s+4\.0\s+<-- change")
         self.assertRegex(out, r"axis0\.controller\.config\.control_mode\s+3\s+1\s+<-- change")
         self.assertRegex(out, r"axis0\.config\.startup_closed_loop_control\s+True\s+False\s+<-- change")
-        self.assertRegex(out, r"config\.dc_max_negative_current\s+-3\.0\s+-3\.0\n")   # unchanged
+        self.assertRegex(out, r"config\.dc_max_negative_current\s+-3\.0\s+-1\.5\s+<-- change")   # 50 W resistor
         self.assertIn("odrv0.axis0.motor.config.current_lim = 4.0", out)
-        self.assertNotIn("odrv0.config.dc_max_negative_current", out)              # no change -> no command
+        self.assertIn("odrv0.config.dc_max_negative_current = -1.5", out)
+        self.assertIn("odrv0.axis0.motor.config.torque_constant = 0.5", out)
         self.assertNotIn("odrv0.axis0.motor.config.pole_pairs", out)
-        self.assertIn("12 change(s)", out)
+        self.assertIn("14 change(s)", out)
 
     def test_dry_run_without_dump_lists_everything(self):
         buf = io.StringIO()
@@ -260,11 +261,12 @@ class TestSetupScript(unittest.TestCase):
         # the real dump has errors set but the axis is IDLE and vbus is in range:
         # the setup itself is allowed (it changes no motion state)
         self.assertEqual(rc, 0)
-        self.assertEqual(len(odrv.writes), 12)
+        self.assertEqual(len(odrv.writes), 14)
         self.assertEqual(odrv.calls, [])
         written = dict(odrv.writes)
         self.assertEqual(written["axis0.config.startup_closed_loop_control"], False)
-        self.assertNotIn("config.dc_max_negative_current", written)
+        self.assertEqual(written["config.dc_max_negative_current"], -1.5)   # 50 W resistor
+        self.assertEqual(written["axis0.motor.config.torque_constant"], 0.5)
 
     def test_missing_paths_are_skipped(self):
         vals = ready_values(self.p)

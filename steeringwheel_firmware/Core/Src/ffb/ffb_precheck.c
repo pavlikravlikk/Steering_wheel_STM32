@@ -188,6 +188,10 @@ ffb_reason_t ffb_precheck_evaluate(const ffb_pc_table_t *t, const ffb_limits_t *
   {
     return FFB_REASON_POSITION_STALE;
   }
+  if (!ctx->wheel_in_range)
+  {
+    return FFB_REASON_WHEEL_OUT_OF_RANGE;
+  }
   for (unsigned i = 0U; i < (unsigned)FFB_PC_COUNT; i++)
   {
     if (!in_use(t, i))

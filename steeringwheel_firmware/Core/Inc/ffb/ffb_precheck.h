@@ -69,6 +69,8 @@ typedef struct
   uint32_t profile_safety_tbd;   /* PROFILE_SAFETY_TBD_COUNT               */
   bool     require_measured;     /* FFB_REQUIRE_MEASURED_PROFILE           */
   bool     position_fresh;
+  bool     wheel_in_range;       /* |angle| <= lock/2 from the centre (arming outside the range
+                                    would start inside the end-stop wall)                   */
 } ffb_pc_context_t;
 
 void ffb_limits_default(ffb_limits_t *lim);

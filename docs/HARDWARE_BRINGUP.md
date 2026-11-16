@@ -113,6 +113,7 @@ Failure: `implied tooth ratio ... does not match` or about 5000 counts per turn 
 skipping. Do not continue to H7 until the measured `cpr` is an integer equal to the profile.
 
 ## H6. Gentle ODrive profile
+(2026-11-16: the profile now proposes `dc_max_negative_current = -1.5 A` for the 50 W / 2 ohm brake resistor and `torque_constant = 0.5`, the live value; use `--read` so the diff is against the live ODrive, not the old dump.)
 1. Review the `[odrive]` section of the profile (current limit, vel limit, voltage trips,
    watchdog, torque constant). Regenerate: `python3 tools/gen_config.py`.
 2. Look first: `python3 tools/generated/odrive_setup.py` (dry run, prints the commands) and

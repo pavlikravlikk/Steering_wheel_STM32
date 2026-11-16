@@ -80,7 +80,7 @@ void ffb_service_buttons(ffb_service_t *s, bool b1, uint16_t buttons, uint32_t n
   }
 }
 
-static ffb_pc_context_t context(const ffb_service_t *s, bool position_fresh)
+static ffb_pc_context_t context(const ffb_service_t *s, bool position_fresh, float angle_turns)
 {
   ffb_pc_context_t c;
   c.arm_allowed_build = s->cfg.arm_allowed;
@@ -88,6 +88,8 @@ static ffb_pc_context_t context(const ffb_service_t *s, bool position_fresh)
   c.profile_safety_tbd = s->cfg.profile_safety_tbd;
   c.require_measured = s->cfg.require_measured;
   c.position_fresh = position_fresh;
+  c.wheel_in_range = position_fresh && (s->tcfg.half_range_turns > 0.0f)
+                  && (((angle_turns >= 0.0f) ? angle_turns : -angle_turns) <= s->tcfg.half_range_turns);
   return c;
 }
 
@@ -327,7 +329,7 @@ void ffb_service_cycle(ffb_service_t *s, uint32_t now_ms)
   in.consec_timeouts = s->consec_timeouts;
   in.consec_tx_failures = s->consec_tx_failures;
   {
-    const ffb_pc_context_t ctx = context(s, fresh);
+    const ffb_pc_context_t ctx = context(s, fresh, angle);
     in.precheck_reason = ffb_precheck_evaluate(&s->pc, &s->lim, &ctx, now_ms, FFB_PRECHECK_MAX_AGE_MS);
     in.precheck_complete = (s->sm.state == FFB_STATE_PRECHECK)
                         && (ffb_pc_complete(&s->pc, now_ms, FFB_PRECHECK_MAX_AGE_MS) || any_failed(&s->pc));

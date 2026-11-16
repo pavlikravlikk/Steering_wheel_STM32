@@ -193,6 +193,34 @@ static void to_running(ffb_service_t *s)
 }
 
 /* ---------------- tests ---------------- */
+TEST(test_svc_does_not_arm_with_wheel_outside_the_range)
+{
+  ffb_service_t s;
+  ffb_service_cfg_t c = cfg_armable();
+  mock_ready();
+  T = 0;
+  ffb_service_init(&s, &c, &k_io, T);
+  /* half range of the profile lock-to-lock, plus a margin: already inside the end-stop wall */
+  M.angle = s.tcfg.half_range_turns + 0.05f;
+  run_ms(&s, 10000, false, 0);
+  CHECK_EQ_INT(s.bg_reason, FFB_REASON_WHEEL_OUT_OF_RANGE);
+  do_arm_gesture(&s);
+  run_ms(&s, 600, false, 0);
+  CHECK_EQ_INT(s.sm.state, FFB_STATE_DISARMED);
+  CHECK_EQ_INT(M.nwrites, 0);
+  /* the other side too */
+  M.angle = -(s.tcfg.half_range_turns + 0.05f);
+  run_ms(&s, 2000, false, 0);
+  CHECK_EQ_INT(s.bg_reason, FFB_REASON_WHEEL_OUT_OF_RANGE);
+  /* back inside the range: ready, and the gesture arms */
+  M.angle = s.tcfg.half_range_turns - 0.05f;
+  run_ms(&s, 2000, false, 0);
+  CHECK_EQ_INT(s.bg_reason, FFB_REASON_OK);
+  do_arm_gesture(&s);
+  run_ms(&s, 600, false, 0);
+  CHECK_EQ_INT(s.sm.state, FFB_STATE_RUNNING);
+}
+
 TEST(test_svc_b1_only_mode_arms_and_default_mode_does_not)
 {
   ffb_service_t s;
@@ -597,6 +625,7 @@ TEST(test_svc_status_report_layout)
 void run_ffb_service_tests(void)
 {
   printf("ffb service (mock ODrive)\n");
+  RUN(test_svc_does_not_arm_with_wheel_outside_the_range);
   RUN(test_svc_b1_only_mode_arms_and_default_mode_does_not);
   RUN(test_svc_no_write_before_arm);
   RUN(test_svc_arm_not_allowed_build);

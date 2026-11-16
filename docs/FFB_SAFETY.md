@@ -27,7 +27,7 @@ Code: `Core/Src/ffb/` and `Core/Inc/ffb/` (compiled only with `WHEEL_FFB=ON`).
 The firmware **never** writes configuration (`config.*`, `startup_*`, `current_lim`,
 `vel_limit`, `control_mode`, watchdog settings, `torque_constant`), never clears errors and
 never calls `save_configuration`. It only **reads** those values to decide whether it may
-arm. (Tests: `tests/test_ffb_core.c` allowlist cases, `tests/test_safety.c`, 17 mutation tests.)
+arm. (Tests: `tests/test_ffb_core.c` allowlist cases, `tests/test_safety.c`, 20 mutation tests.)
 
 ## 3. What must be true before the motor can be driven
 
@@ -53,7 +53,9 @@ All of these, in this order:
    `test_svc_b1_only_mode_*`.
    Optional (off by default, `FFB_ARM_PINS=1` through `-DWHEEL_EXTRA_DEFINES=FFB_ARM_PINS=1`): two push buttons PD0 / PD1
    to GND act as the two paddles (`ffb_buttons_with_arm_pins()`); nothing is configured on those pins unless enabled.
-5. **Precheck** (read-only, all values re-read after the gesture, within 2 s):
+5. **Precheck** (read-only, all values re-read after the gesture, within 2 s). First the wheel must be inside
+   the steering range (`|angle| <= lock/2` from the centre, reason `WHEEL_OUT_OF_RANGE` otherwise), so the wall of
+   the soft end stop can never start under the wheel;
    `axis0.config.enable_watchdog` = True; `watchdog_timeout` inside
    [`ffb.watchdog_timeout_min_s`, `ffb.watchdog_timeout_max_s`];
    `controller.config.control_mode` = 1 (torque); `motor.config.current_lim` <= `odrive.current_lim`
@@ -92,6 +94,12 @@ If a check fails the wheel stays DISARMED and shows the reason (section 6).
   STM32 and the ODrive firmware working. The only independent protection is the ODrive
   watchdog and your hand on the 24 V switch. **Fit an e-stop that cuts the motor supply
   before using FFB with the wheel mounted.**
+- **Rotation limit (no mechanical stop yet):** the HID axis clamps at +-lock/2, but the wheel itself can still turn
+  endlessly. With FFB armed there is a soft wall beyond +-lock/2 (smoothstep over `endstop_width_deg`, plus damping
+  while moving outward), limited by `ffb.max_amps` (0.3 A in the first tests): a hand overpowers it; when DISARMED or
+  FAULT there is no limit at all. The centre is the power-up position, so power up with the wheel straight. A real
+  multi-turn mechanical stop is needed before the wheel is mounted (a single pin only gives about +-170 deg; for 900 deg
+  use a lead-screw / spiral / cable stop, or reduce `lock_to_lock_deg` to about 300 and use a pin).
 - With 4 kg of rotating mass and no mechanical stop, the wheel can hurt fingers, cables or
   wrists, even at 1 A. The soft end stop is only a force, not a stop.
 - Commutation depends on the gear-driven encoder (20:20 pinion + internal gear). A slipping, skipping or
@@ -128,7 +136,8 @@ Pre-arm reasons (N): 1 ARM_NOT_ALLOWED, 2 PROFILE_TBD, 3 SIMULATION_BUILD, 4 POS
 5 READ_TIMEOUT, 6 WATCHDOG_DISABLED, 7 WATCHDOG_TIMEOUT_RANGE, 8 CONTROL_MODE,
 9 CURRENT_LIM_HIGH, 10 VEL_LIMIT_HIGH, 11 MOTOR_NOT_CALIBRATED, 12 ENCODER_NOT_READY,
 13 AXIS_ERROR, 14 MOTOR_ERROR, 15 ENCODER_ERROR, 16 VBUS_RANGE, 17 TORQUE_CONSTANT_RANGE,
-18 NOT_CHECKED_YET, 19 READ_ERROR, 20 NOT_IDLE (axis not IDLE before arming, e.g.
+18 NOT_CHECKED_YET, 19 READ_ERROR, 21 WHEEL_OUT_OF_RANGE (the wheel is already beyond +-lock/2 from the centre: turn it back inside the range, or re-centre with B1 held 1 s),
+20 NOT_IDLE (axis not IDLE before arming, e.g.
 because `startup_closed_loop_control` is True).
 Faults (N): 1 POSITION_STALE, 2 ODRIVE_ERROR, 3 UART_TIMEOUT, 4 VBUS_RANGE,
 5 WATCHDOG_FEED_FAILED, 6 TORQUE_INVALID, 7 OVERSPEED, 8 ARMING_TIMEOUT, 9 LOOP_OVERRUN,

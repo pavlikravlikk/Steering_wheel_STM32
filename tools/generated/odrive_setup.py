@@ -23,7 +23,7 @@ SETTINGS = [
     ('axis0.motor.config.pole_pairs', 15),
     ('axis0.motor.config.current_lim', 4.0),
     ('axis0.motor.config.calibration_current', 3.0),
-    ('axis0.motor.config.torque_constant', 0.04),
+    ('axis0.motor.config.torque_constant', 0.5),
     ('axis0.encoder.config.mode', 0),
     ('axis0.encoder.config.cpr', 2400),
     ('axis0.encoder.config.use_index', False),
@@ -37,7 +37,7 @@ SETTINGS = [
     ('config.dc_bus_overvoltage_trip_level', 30.0),
     ('config.dc_bus_undervoltage_trip_level', 18.0),
     ('config.dc_max_positive_current', 6.0),
-    ('config.dc_max_negative_current', -3.0),
+    ('config.dc_max_negative_current', -1.5),
 ]
 DEFAULT_DUMP = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "docs",
                                              "odrive_dump.txt"))

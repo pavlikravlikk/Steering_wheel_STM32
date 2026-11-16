@@ -36,7 +36,7 @@ run_step "host C tests (make -C tests)" make -C tests
 run_step "host Python tests" python3 -m unittest discover -s tools/tests -t tools -q
 
 # --- 3b. mutation tests: every disabled safety check must make a test fail ---
-run_step "mutation tests (18 safety mutations killed)" bash tools/mutation_test.sh
+run_step "mutation tests (20 safety mutations killed)" bash tools/mutation_test.sh
 
 # --- 4. firmware configurations ---------------------------------------------
 # name | cmake options

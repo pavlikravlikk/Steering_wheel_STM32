@@ -473,7 +473,7 @@ static void pc_fill_ok(ffb_pc_table_t *t, uint32_t now)
 
 static ffb_pc_context_t ctx_ok(void)
 {
-  ffb_pc_context_t c = { true, false, 0U, true, true };
+  ffb_pc_context_t c = { true, false, 0U, true, true, true };
   return c;
 }
 
@@ -555,6 +555,10 @@ TEST(test_precheck_context_and_failed_reads)
   c.require_measured = false;
   CHECK_EQ_INT(ffb_precheck_evaluate(&t, &lim, &c, 10, 1000), FFB_REASON_OK);
   c = ctx_ok(); c.position_fresh = false;
+  CHECK_EQ_INT(ffb_precheck_evaluate(&t, &lim, &c, 10, 1000), FFB_REASON_POSITION_STALE);
+  c = ctx_ok(); c.wheel_in_range = false;                  /* wheel already beyond +-lock/2 */
+  CHECK_EQ_INT(ffb_precheck_evaluate(&t, &lim, &c, 10, 1000), FFB_REASON_WHEEL_OUT_OF_RANGE);
+  c.position_fresh = false;                                /* stale position is reported first */
   CHECK_EQ_INT(ffb_precheck_evaluate(&t, &lim, &c, 10, 1000), FFB_REASON_POSITION_STALE);
   c = ctx_ok();
   ffb_pc_store_failed(&t, FFB_PC_VEL_LIMIT);

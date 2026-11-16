@@ -31,7 +31,8 @@ Order and safety rules come from `docs/HARDWARE_BRINGUP.md` and `docs/FFB_SAFETY
 | Motor current | ODrive `current_lim` 4 A (firmware refuses to arm above the profile); FFB `max_amps` <= 1 A (code cap), 0.3 A for the first tests, slew 5 A/s | profile + firmware |
 | Speed | `vel_limit` 2 turns/s, ODrive overspeed error, firmware OVERSPEED at 3 turns/s | profile + firmware |
 | STM32 hang / unplugged wire | ODrive watchdog 0.25 s; firmware FAULT | ODrive + firmware |
-| Regeneration | brake resistor 50 W / 2 ohm on AUX; at -3 A the peak is about 70-90 W (> 50 W continuous): lower to about -1.5 A, heat sink | profile + hardware |
+| Regeneration | brake resistor 50 W / 2 ohm on AUX; the profile now limits `dc_max_negative_current` to -1.5 A (about 36 W), heat sink still needed | profile + hardware |
+| Rotation range | HID clamps at +-lock/2; arming refused when the wheel is outside the range (`WHEEL_OUT_OF_RANGE`); soft wall under FFB; **no mechanical stop yet** (needed before the wheel is mounted) | firmware + (missing) hardware |
 | Accidental start | arm gesture (B1 + 2 paddles, or B1 tap-tap-hold with `WHEEL_FFB_ARM_B1_ONLY=1`, wheel dismounted only) + full precheck | firmware |
 
 ## D. Not protected (read this)

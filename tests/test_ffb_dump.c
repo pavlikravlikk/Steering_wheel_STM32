@@ -159,7 +159,7 @@ TEST(test_dump_real_values_block_arming_in_order)
 {
   ffb_pc_table_t t;
   ffb_limits_t lim;
-  ffb_pc_context_t c = { true, false, 0U, true, true };
+  ffb_pc_context_t c = { true, false, 0U, true, true, true };
   load_dump();
   ffb_limits_default(&lim);
   table_from_dump(&t, 10);
