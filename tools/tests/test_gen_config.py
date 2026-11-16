@@ -60,7 +60,7 @@ class TestProfile(unittest.TestCase):
         h = gen_config.gen_header(load())
         for needle in ("#define ENCODER_COUNTS_PER_WHEEL_REV  2400", "#define WHEEL_LOCK_TO_LOCK_DEG        900",
                        "#define ODRIVE_TURNS_PER_WHEEL_REV    1.0f", "#define ODRIVE_UART_BAUD              115200U",
-                       "#define MCP23017_I2C_ADDR_7BIT        0x20U", "#define ODRIVE_INVERT_DIRECTION       0"):
+                       "#define MCP23017_I2C_ADDR_7BIT        0x20U", "#define ODRIVE_INVERT_DIRECTION       1"):
             self.assertIn(needle, h)
 
     def test_header_macros_are_guarded(self):
@@ -93,8 +93,9 @@ class TestProfile(unittest.TestCase):
         self.assertEqual(d["cpr"], 2400)
         self.assertTrue(d["cpr_is_integer"])
         self.assertEqual(d["odrive_turns_per_wheel_rev"], 1.0)
-        # the direction is NOT decided by the gear count: it stays a bench decision
-        self.assertEqual(p["wheel"]["invert"]["status"], "TBD")
+        # the direction was decided on the bench (2026-11-16): clockwise lowered X, so invert is true
+        self.assertEqual(p["wheel"]["invert"]["status"], "measured")
+        self.assertIs(p["wheel"]["invert"]["value"], True)
 
     def test_integer_ratio_gives_scaled_cpr(self):
         p = load()

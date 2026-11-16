@@ -5,8 +5,8 @@
 #define WHEEL_CONFIG_GENERATED_H
 
 #define PROFILE_VERSION               1
-#define PROFILE_TBD_COUNT             25U   /* entries still marked TBD          */
-#define PROFILE_SAFETY_TBD_COUNT      20U   /* ...in belt/encoder/motor/odrive/wheel/uart */
+#define PROFILE_TBD_COUNT             24U   /* entries still marked TBD          */
+#define PROFILE_SAFETY_TBD_COUNT      19U   /* ...in belt/encoder/motor/odrive/wheel/uart */
 /* List of TBD entries: make status (tools/project_status.py). */
 
 /* --- encoder / belt / steering ------------------------------------- */
@@ -32,10 +32,10 @@
 #define WHEEL_LOCK_TO_LOCK_DEG        900
 #endif
 #ifndef ENCODER_INVERT_DIRECTION
-#define ENCODER_INVERT_DIRECTION      0
+#define ENCODER_INVERT_DIRECTION      1
 #endif
 #ifndef ODRIVE_INVERT_DIRECTION
-#define ODRIVE_INVERT_DIRECTION       0
+#define ODRIVE_INVERT_DIRECTION       1
 #endif
 #ifndef ODRIVE_TURNS_PER_WHEEL_REV
 #define ODRIVE_TURNS_PER_WHEEL_REV    1.0f   /* ODrive turns (= motor turns) per wheel turn */
