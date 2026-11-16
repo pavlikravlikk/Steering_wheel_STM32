@@ -112,7 +112,7 @@ arm_hold_ms             = { value = 3000, status = "assumed", how_to_measure = "
 [pins]
 # Documentation only (the firmware pin usage is fixed in code / the .ioc).
 usb       = { value = "PA11 = USB_DM, PA12 = USB_DP (USB USER connector)", status = "measured", how_to_measure = "STM32F3Discovery schematic." }
-uart_tx   = { value = "PA9 = USART1_TX -> ODrive GPIO2 (RX)", status = "TBD", how_to_measure = "Check wiring with a multimeter (docs/BENCH_CHECKLIST.md step 4)." }
-uart_rx   = { value = "PA10 = USART1_RX <- ODrive GPIO1 (TX)", status = "TBD", how_to_measure = "Check wiring with a multimeter (docs/BENCH_CHECKLIST.md step 4)." }
+uart_tx   = { value = "PA9 = USART1_TX -> ODrive GPIO2 (RX)", status = "measured", note = "bench 2026-11-16: wired PA9 -> GPIO2, LD5 goes off and X follows the encoder, so the link works (no multimeter check was done)", how_to_measure = "Check wiring with a multimeter (docs/BENCH_CHECKLIST.md step 4)." }
+uart_rx   = { value = "PA10 = USART1_RX <- ODrive GPIO1 (TX)", status = "measured", note = "bench 2026-11-16: wired PA10 <- GPIO1, GND common, UART position stream works (LD5 off, X follows the wheel)",  how_to_measure = "Check wiring with a multimeter (docs/BENCH_CHECKLIST.md step 4)." }
 i2c       = { value = "PB6 = I2C1_SCL, PB7 = I2C1_SDA (MCP23017)", status = "TBD", how_to_measure = "Check wiring." }
 b1        = { value = "PA0 = blue user button B1 (set centre / arm gesture)", status = "measured", how_to_measure = "Discovery board." }
