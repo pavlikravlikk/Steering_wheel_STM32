@@ -1,8 +1,21 @@
 # STM32F3DISCOVERY USB Steering Wheel Controller
 
-Native USB HID joystick (no force feedback) on an **STM32F3DISCOVERY** (STM32F303VCT6):
-**3 axes + 16 button bits**, 1 ms report rate. The repository contains the CubeMX/CMake
-firmware and a Python visualizer / demo game.
+Native USB HID joystick on an **STM32F3DISCOVERY** (STM32F303VCT6): **3 axes + 16 button
+bits**, 1 ms report rate. Optional, separately built **force feedback** (USB HID PID, MKS
+ODrive Mini + hoverboard hub motor), **off by default**. The repository contains the
+CubeMX/CMake firmware, host tools (all Python standard library) and a visualizer / demo game.
+
+**Start here:**
+
+| What | Where |
+|---|---|
+| The day the hardware arrives (ordered steps, tools) | `docs/HARDWARE_BRINGUP.md` |
+| The ONE file with all hardware values | `config/hardware_profile.toml` -> `python3 tools/gen_config.py` |
+| Everything checked at once (tests, 4 builds, scans, mutations) | `bash tools/check_all.sh` |
+| What is still unknown / blocked | `make status` -> `docs/STATUS.md` |
+| Force feedback: safety case and bring-up | `docs/FFB_SAFETY.md` |
+| Module overview, adding pedals later | `docs/ARCHITECTURE.md` |
+| Decisions made without the owner | `docs/DECISIONS.md` |
 
 | Item | Source | Status |
 | :--- | :--- | :--- |
@@ -11,10 +24,32 @@ firmware and a Python visualizer / demo game.
 | Z – brake | pedals (future) | declared, `HID_AXIS_Z_NEUTRAL` (0) |
 | Buttons 1–10 | MCP23017 I/O expander on I2C1 (0x20) | implemented (bits 0..9; bits 10..15 reserved, `0`) |
 
-> **Status / safety (2026-11-15):** the firmware never commands the motor. The ODrive driver
-> can only transmit `f <axis>` / `r <path>` (enforced by an allowlist + tests). See
-> `docs/DECISIONS.md`, `docs/BENCH_CHECKLIST.md`, `docs/IOC_TODO.md`, `docs/AUDIT.md`,
-> `docs/TEAMMATE_REVIEW.md`. Host unit tests: `make -C tests` (`tests/README.md`).
+> **Status / safety (2026-11-16):** the **default** firmware never commands the motor. The
+> ODrive driver can only transmit `f <axis>` / `r <path>` (enforced by an allowlist, tests and a
+> scan of the binary). Force feedback exists only in a separate build
+> (`-DWHEEL_FFB=ON`), cannot arm unless additionally built with `-DWHEEL_FFB_ARM_ALLOWED=1`,
+> and has **never run on the real motor** - read `docs/FFB_SAFETY.md` first.
+> Host tests: `make test` (C: `make -C tests`, Python: `tools/tests`).
+
+### Host tools (`tools/`, Python 3.11+ standard library only, never need sudo)
+
+| Tool | Purpose |
+|---|---|
+| `gen_config.py` | profile -> `Core/Inc/wheel_config_generated.h` + `tools/generated/odrive_setup.py` (dry run by default) + `odrive_calibrate.py` |
+| `odrive_status.py` | read-only ODrive "doctor": decoded errors, startup flags, profile differences, FFB pre-arm verdict (`--fixture` for saved dumps) |
+| `hid_probe.py` | live view of the HID reports (`--selftest`, `--file`, `--status` for the FFB status report) |
+| `measure_counts.py` | hand measurement -> counts per turn, belt ratio, `cpr` |
+| `project_status.py` | `make status`: TBD list, blockers, TODO(TBD) markers, test results |
+| `check_all.sh`, `mutation_test.sh` | full host verification |
+| `99-steeringwheel.rules` | udev rule (hidraw + input) for VID 0483 / PID 5752 |
+
+### Force feedback build (optional)
+```bash
+cmake --preset Debug -DWHEEL_FFB=ON                             # HID PID, can NOT arm
+cmake --preset Debug -DWHEEL_FFB=ON -DWHEEL_FFB_ARM_ALLOWED=1   # can arm - see docs/FFB_SAFETY.md
+```
+The FFB build reports Report ID 0x01 + the same 8 bytes (9 bytes), plus HID PID reports.
+Arm: hold B1 + both paddles 3 s; disarm: press B1. Status LEDs LD6/LD8/LD4.
 
 ---
 
@@ -336,7 +371,9 @@ python stm_32_wheel.py
   the **ten button indicators** (1..10). If the header says *"Demo mode"* the board was not
   found: use ←/→ or A/D to steer and keys `1`..`9`, `0` to emulate buttons 1..10.
 - `MAX_ANGLE` (display only) is 270° per side; `INVERT` flips the display direction.
-- The visualizer expects the new 8-byte report; an old 2-byte firmware report is ignored.
+- The visualizer accepts the 8-byte report and the FFB build's 9-byte report (ID 0x01); it
+  shows X, the reserved Y/Z bars and all 16 buttons (11..16 dimmed: not wired).
+- The ready-made udev rule is `tools/99-steeringwheel.rules` (uses `TAG+="uaccess"`).
 
 ---
 
@@ -344,12 +381,13 @@ python stm_32_wheel.py
 
 Nothing below has been run on the real board:
 
-- **Firmware build with `arm-none-eabi-gcc`.** The ARM toolchain is not installed in the
-  authoring environment and I had no way to install it there, so `cmake --preset Debug &&
-  cmake --build --preset Debug` was **not run** and "builds with no warnings" is **not
-  confirmed**. Only the new modules' logic was compiled with the host `gcc -Wall -Wextra`
-  against a mocked HAL (clean, tests passing) – that does not cover real HAL headers, the
-  cross-compiler, or linking.
+- **Firmware build:** since 2026-11-15 every configuration (default, `SIMULATE_INPUTS`,
+  `WHEEL_FFB=ON` with and without `WHEEL_FFB_ARM_ALLOWED`) is compiled and linked with
+  `arm-none-eabi-gcc` 14.2 by `tools/check_all.sh`, with zero warnings in our sources. It has
+  not been flashed or run on the board in these sessions.
+- **Force feedback** (everything in `Core/Src/ffb`): host tests, a simulated ODrive and a
+  descriptor self-check only; never enumerated by Linux, never connected to the motor. See
+  `docs/FFB_SAFETY.md` section 9.
 - **Datasheet / schematic facts**: TIM3 on PC6/PC7 = AF2, that PC6/PC7 are free on the board
   and 5 V tolerant, the board's I2C pull-ups and the LSM303 addresses are from memory – the
   datasheet and UM1570 could not be fetched. Check them before wiring a 5 V push-pull encoder.

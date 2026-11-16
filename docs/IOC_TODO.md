@@ -57,3 +57,14 @@ Label suggestion: PA9 `ODRIVE_TX` (→ ODrive GPIO2/RX), PA10 `ODRIVE_RX` (← O
 7. PA0 / B1: **"SET_CENTRE"** — hold 1 s to make the current wheel position the centre.
 8. LEDs: LD3 heartbeat, LD7 USB configured, **LD5 (PE10, orange) = ODrive position missing/stale**,
    **LD9 (PE12, blue) toggles = centre accepted**, LD10 blinking = MCP23017 not responding.
+
+## 6. Force feedback build (session 2) - nothing to change in CubeMX
+- **No generated file and no middleware file was edited for FFB.** The FFB build (`-DWHEEL_FFB=ON`) uses its own
+  USB class driver `Core/Src/ffb/usbd_ffb_hid.c` (same endpoints 0x81/0x01, 64 bytes, the PMA addresses already
+  in `usbd_conf.c`), installed from `ffb_board_init()` in `main.c` USER CODE 2.
+- Files touched only inside USER CODE blocks: `Core/Src/main.c` (Includes, PV, 2, WHILE).
+- `usbd_conf.h` keeps `USBD_CUSTOM_HID_REPORT_DESC_SIZE 42` and `USBD_CUSTOMHID_OUTREPORT_BUF_SIZE 2` - correct for
+  the default build; the FFB class does not use them.
+- LEDs LD4 (PE8), LD6 (PE15), LD8 (PE14) are used by the FFB build for status; they are already GPIO outputs in
+  the generated `MX_GPIO_Init()`. Labels suggestion: LD6 `FFB_READY`, LD8 `FFB_CODE`, LD4 `FFB_FAULT`.
+- The DWT cycle counter is enabled in `ffb_board_init()` (loop-time statistics); nothing in CubeMX.

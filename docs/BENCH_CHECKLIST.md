@@ -110,3 +110,13 @@ With both boards powered but the signal wires **not** yet connected:
    ODrive watchdog, add an e-stop.
 4. Only then, with explicit approval, review `centering_law.c` for wiring to the ODrive (it is
    currently not compiled into the firmware and no torque path exists).
+
+---
+
+# LATER, SEPARATE: force feedback bring-up
+
+**Only after steps 0-8 above, `docs/HARDWARE_BRINGUP.md` H0-H9, and an owner decision.**
+The full procedure (F0-F8: FFB build that cannot arm, precheck reasons, watchdog test in
+odrivetool, first arm with the wheel dismounted at 0.3 A, every fault on purpose, `fftest`,
+and only then the wheel mounted with a hardware e-stop) is in **`docs/FFB_SAFETY.md`
+section 8**. LED codes are in section 6 of the same file.

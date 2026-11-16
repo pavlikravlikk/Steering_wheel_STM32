@@ -90,3 +90,59 @@ One line per decision: **what** — why — how to change it.
 - Python tests: `python3 -m unittest discover -s tools/tests -t tools` (stdlib only). `make test` runs C+Python.
 - `stm_32_wheel.py`: shows Y/Z bars and 16 buttons; accepts the 8-byte report and the FFB build's 9-byte
   report (ID 0x01); other report IDs are ignored. Its parser is unit-tested without pygame (AST extraction).
+
+## Step 2: force feedback (all behind `WHEEL_FFB`, default OFF)
+- **Layout:** everything that can write lives in `Core/Src/ffb` + `Core/Inc/ffb`, listed in CMake only in
+  `WHEEL_FFB_SOURCES`, added only under `if(WHEEL_FFB)`. Outside `ffb/`, every FFB reference is inside
+  `#if WHEEL_FFB` (checked by `tests/test_safety.c`). — hard rule 1 — n/a.
+- **Default binary:** byte-identical after Step 1. Step 2 changed shared files (`odrive_ascii.c` gained the one-shot
+  `r <path>` read; `odrive_uart.c`/`odrive_link.c`/`hid_report.c`/`main.c` gained `#if WHEEL_FFB` blocks), so the
+  default binary is no longer byte-identical, but its behaviour is: no read is ever queued in the default build
+  (the queue API is `#if WHEEL_FFB` in `odrive_link`), the TX path of the default build is the old code verbatim
+  (`#if !WHEEL_FFB`), single-number lines still count as parse errors (new test), and the binary scan finds no
+  write token. — necessary to share the parser — n/a.
+- **Reads for the precheck** reuse the existing client: one request outstanding at a time; a reply with one
+  number = the read, two numbers = position. — unambiguous without changing the protocol — `odrive_ascii.c`.
+- **Writes**: three kinds only (`input_torque`, `requested_state 1|8`, `u 0`), allowlisted in `ffb_cmd.c` and
+  re-checked in `odrive_uart_send_ffb()`. Torque formatted `[-]d.dddd` by own code (no printf). — hard rule 3.
+- **UART queue (FFB build only):** 160-byte line queue; an urgent stop drops queued lines that have not started
+  but finishes the line on the wire (the ODrive never sees a truncated command). — `odrive_uart.c`.
+- **Control cycle = ODrive command cycle = 5 ms (200 Hz)**, not 1 kHz: 48 bytes/cycle at 115200 baud is 83 %
+  of the link. Order per cycle: request first (reply overlaps the writes), then torque, then feed. — measured by
+  arithmetic — `ffb.command_period_ms`, `uart.baud`.
+- **States:** DISARMED -> PRECHECK -> ARMING -> RUNNING, FAULT latched until power cycle; user disarm (B1) goes
+  to DISARMED (not latched) and re-sends IDLE 3x. FAULT re-sends torque 0 + IDLE every 500 ms. — task — `ffb_safety.c`.
+- **DISARMED sends nothing** (only background READS for the status display, one per 100 ms) unless
+  `FFB_FEED_WATCHDOG_WHEN_DISARMED=1` (default 0, TODO(TBD) after bench step F3). — task — `ffb_config.h`.
+- **Arm gesture:** B1 + both paddles 3 s, only after all three were released; B1 alone = disarm. Set-centre (B1 held
+  1 s) is allowed only while DISARMED, with no paddle held, and not within 2 s after a disarm (a centre jump while
+  running would jerk the motor). — no accidental arming, no accidental re-centre — `ffb_ui.c`, `hid_report.c`.
+- **Profile gate:** FFB refuses to arm while any safety-section profile entry is TBD (`FFB_REQUIRE_MEASURED_PROFILE=1`).
+  — "do not invent facts" applied to the motor — `-DFFB_REQUIRE_MEASURED_PROFILE=0` only for deliberate tests.
+- **Closed-loop confirmation:** ARMING reads `axis0.current_state` (`FFB_VERIFY_CLOSED_LOOP=1`). This path is not in
+  the owner's "known to exist" list (TODO(TBD)); if it does not exist the read fails and arming ends in
+  ARMING_TIMEOUT - fail safe. — `ffb_config.h`.
+- **Lost replies while running:** one failed read does not fault; the value ages (READ_FAILED after 400 ms) and
+  consecutive timeouts give UART_TIMEOUT after 8. — robustness without losing coverage — `ffb_service.c`.
+- **Hard cap** `FFB_HARD_CAP_AMPS = 1.0` in code (static assert), profile `ffb.max_amps` can only lower it. —
+  task — code change + review to raise.
+- **End stops:** smoothstep wall over `ffb.endstop_width_deg` beyond +-lock/2, damping only while moving outward.
+  Centring spring disabled while game effects play (`FFB_SPRING_ONLY_WITHOUT_HOST=1`). — `ffb_torque.c`.
+- **HID PID descriptor (FFB build only):** own design from the PID 1.0 usage table + Linux hid-pidff requirements
+  (read with WebFetch from torvalds/linux master `drivers/hid/usbhid/hid-pidff.c`, GPL-2.0-or-later: requirements
+  only, no code copied). Report IDs: 0x01 joystick, 0x02 PID state, 0x11-0x1A outputs, 0x21-0x23 features,
+  0x40 vendor status. 16 effect slots, allocated lowest-first so Linux's autocentre probe gets index = logical
+  minimum and does not assume a built-in spring. Device Managed Pool = 1. — `ffb_hid_desc.c`.
+- **Game force direction:** X component = sin(direction), 90 deg = +X; `FFB_INVERT_HOST_FORCE` TODO(TBD) with fftest. —
+  convention, unverified — `ffb_config.h`.
+- **Duration 0 and 0xFFFF = forever; loop count 0 = once, 255 = forever.** — Linux sends all ones for infinite — `ffb_pid.c`.
+- **USB plumbing:** a separate class driver `Core/Src/ffb/usbd_ffb_hid.c` instead of patching the CustomHID middleware
+  (which forwards only 2 OUT bytes, has no GET_REPORT, and stores the report-descriptor length in one byte). Same
+  endpoints/PMA as `usbd_conf.c`. Installed by swapping the class pointer right after `MX_USB_DEVICE_Init()`;
+  **no USBD_Stop/Start** because on the F3 the HAL stop powers the USB cell down and start does not undo it.
+  **No generated file and no middleware file was edited.** — rule 6 — `ffb_board_init()`.
+- **USB ISR vs main loop:** OUT/SET_REPORT data is copied into a 16-slot queue in the ISR and applied in the main loop;
+  GET_REPORT answers from snapshots. Create New Effect marks Block Load "pending" immediately so the host never
+  reads a stale success. — no shared mutable engine state — `ffb_pid.c`.
+- **Host gone:** USB not configured / suspended, actuators disabled, reset, stop-all, class DeInit -> no game force.
+- **Mutation tests** `tools/mutation_test.sh` (17 mutations, all killed) are part of `tools/check_all.sh`.
