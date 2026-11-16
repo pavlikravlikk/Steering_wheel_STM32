@@ -28,9 +28,12 @@ description = "Sim-racing wheel: STM32F3Discovery + MKS ODrive Mini (0.5.x) + ho
 
 # -----------------------------------------------------------------------------
 [belt]
-# Timing belt between the motor housing (rotor) and the encoder pulley.
-teeth_housing = { value = 20, status = "TBD", how_to_measure = "Count the teeth of the toothed ring/gear on the motor housing (mark one tooth with a pen, count once around)." }
-teeth_pulley  = { value = 20, status = "TBD", how_to_measure = "Count the teeth of the pulley on the encoder shaft." }
+# Section name kept for compatibility with the generators/tests. Since 2026-11-16 this is a GEAR PAIR, not a belt:
+# an external pinion on the encoder shaft meshes with an internal gear on the motor housing (the housing is
+# the rotating outer rotor). Ratio teeth_housing:teeth_pulley = 20:20 = 1:1 -> one housing turn = one encoder
+# turn, cpr = 4*600*20/20 = 2400. The EXACT counts per turn must still be verified on the bench (H5).
+teeth_housing = { value = 20, status = "measured", note = "counted by the user, 2026-11-16", how_to_measure = "Teeth of the internal gear on the motor housing. Done (20). Bench check still required: rotate the housing 10 full turns, expect about 24000 counts (tools/measure_counts.py wheel --turns 10 ...)." }
+teeth_pulley  = { value = 20, status = "measured", note = "counted by the user, 2026-11-16", how_to_measure = "Teeth of the external pinion on the encoder shaft. Done (20). Bench check as for teeth_housing." }
 
 # -----------------------------------------------------------------------------
 [encoder]
@@ -42,7 +45,8 @@ has_index    = { value = false, status = "TBD", how_to_measure = "LPD3806 has no
 [motor]
 pole_pairs       = { value = 15, status = "TBD", how_to_measure = "Hoverboard hub motor: 30 magnets = 15 pole pairs (ODrive hoverboard guide). Count magnets or check the motor data." }
 phase_resistance = { value = 0.166, status = "measured", how_to_measure = "Read axis0.motor.config.phase_resistance after a MOTOR_CALIBRATION (ohm). Documentation only." }
-# Direct drive: the steering wheel is bolted to the motor. 1 motor turn = 1 wheel turn.
+# Direct drive: the steering wheel is bolted to the motor housing. 1 housing turn = 1 wheel turn = 1 encoder turn
+# (20:20 gear pair). Still TBD: confirm on the bench (H5/H8), the user only reported the gear teeth.
 motor_turns_per_wheel_rev = { value = 1.0, status = "TBD", how_to_measure = "Turn the steering wheel exactly one full turn and watch the motor housing: number of housing turns. 1.0 for direct drive." }
 
 # -----------------------------------------------------------------------------

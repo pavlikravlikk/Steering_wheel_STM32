@@ -119,6 +119,8 @@ def parse_profile(data):
                 raise ProfileError("%s.%s: how_to_measure is empty" % (section, key))
             out[section][key] = {"value": entry["value"], "status": status,
                                  "how_to_measure": entry["how_to_measure"]}
+            if entry.get("note"):                 # optional free text (who/when confirmed)
+                out[section][key]["note"] = str(entry["note"])
     return out
 
 

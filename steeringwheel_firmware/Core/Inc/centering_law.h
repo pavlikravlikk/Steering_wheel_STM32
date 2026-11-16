@@ -9,7 +9,7 @@
  * This file is deliberately NOT part of the firmware build (see
  * CMakeLists.txt / docs/DECISIONS.md). There is no code path that sends a
  * torque, state or any other write command to the ODrive. Connecting this
- * requires: the belt installed, the encoder calibrated, tightened ODrive
+ * requires: the gear pair verified on the bench, the encoder calibrated, tightened ODrive
  * limits, the ODrive watchdog enabled and fed, an e-stop, and the owner's
  * explicit approval.
  */

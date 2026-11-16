@@ -14,7 +14,7 @@
 typedef struct
 {
   float lock_to_lock_deg;      /* e.g. 540                              */
-  float turns_per_wheel_rev;   /* sensor turns per wheel turn (belt)    */
+  float turns_per_wheel_rev;   /* sensor turns per wheel turn (gears)   */
   bool  invert;
   /* state */
   bool  centred;               /* centre captured                       */

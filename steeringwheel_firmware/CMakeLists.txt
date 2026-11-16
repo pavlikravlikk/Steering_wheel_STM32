@@ -45,7 +45,7 @@ target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE
 # Add sources to executable
 # NOTE: Core/Src/centering_law.c is intentionally NOT listed here. It is pure
 # math, unit-tested on the host only, and must not be wired to the ODrive
-# before the belt, encoder calibration, tightened ODrive limits, watchdog,
+# before the gear pair is verified, encoder calibration, tightened ODrive limits, watchdog,
 # e-stop and the owner's explicit approval (docs/DECISIONS.md).
 target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user sources here

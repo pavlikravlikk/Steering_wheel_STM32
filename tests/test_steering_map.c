@@ -41,7 +41,7 @@ TEST(test_lock_to_lock_and_ratio_configurable)
   CHECK_EQ_INT(steering_map_axis16(&m, 1.25f), 65535);   /* 450 deg */
   CHECK_EQ_INT(steering_map_axis16(&m, 0.625f), 49152);
 
-  /* belt: 3 encoder turns per wheel turn */
+  /* gear/belt ratio: 3 encoder turns per wheel turn (synthetic ratio test, not our 1:1 pair) */
   steering_map_init(&m, 540.0f, 3.0f, false);
   steering_map_set_centre(&m, 0.0f);
   CHECK_NEAR(steering_map_angle_deg(&m, 3.0f), 360.0, 1e-3);

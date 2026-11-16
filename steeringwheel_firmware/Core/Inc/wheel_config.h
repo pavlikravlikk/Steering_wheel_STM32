@@ -45,7 +45,9 @@
 /* Steering encoder (LPD3806-600BM)                                          */
 /* ------------------------------------------------------------------------- */
 /* 600 pulses/rev * 4 (x4 quadrature) = 2400 counts per encoder revolution.
- * Belt ratio between wheel and encoder is assumed 1:1 for now. */
+ * The encoder pinion (20 teeth, external) meshes with the internal gear on the
+ * motor housing (20 teeth): ratio 1:1 (counted 2026-11-16, counts per turn still
+ * to be verified on the bench: tools/measure_counts.py). */
 #ifndef ENCODER_COUNTS_PER_WHEEL_REV
 #define ENCODER_COUNTS_PER_WHEEL_REV  2400
 #endif

@@ -83,6 +83,19 @@ class TestProfile(unittest.TestCase):
         self.assertEqual(errors, [])
         self.assertTrue(any("NOT an integer" in w for w in warnings), warnings)
 
+    def test_gear_pair_20_20_is_measured_and_gives_cpr_2400(self):
+        p = load()
+        for k in ("teeth_housing", "teeth_pulley"):
+            self.assertEqual(p["belt"][k]["value"], 20)
+            self.assertEqual(p["belt"][k]["status"], "measured")
+            self.assertIn("counted by the user, 2026-11-16", p["belt"][k]["note"])
+        d = gen_config.derive(p)
+        self.assertEqual(d["cpr"], 2400)
+        self.assertTrue(d["cpr_is_integer"])
+        self.assertEqual(d["odrive_turns_per_wheel_rev"], 1.0)
+        # the direction is NOT decided by the gear count: it stays a bench decision
+        self.assertEqual(p["wheel"]["invert"]["status"], "TBD")
+
     def test_integer_ratio_gives_scaled_cpr(self):
         p = load()
         set_val(p, "belt", "teeth_housing", 90)
@@ -131,7 +144,8 @@ class TestProfile(unittest.TestCase):
 
     def test_require_measured_rejects_tbd(self):
         errors, _ = gen_config.validate(load(), require_measured=True)
-        self.assertTrue(any("belt.teeth_housing is still TBD" in e for e in errors))
+        self.assertTrue(any("encoder.ppr is still TBD" in e for e in errors))
+        self.assertFalse(any("belt.teeth" in e for e in errors))   # gear pair 20:20 counted 2026-11-16
         p = load()
         for s in p:
             for k in p[s]:
