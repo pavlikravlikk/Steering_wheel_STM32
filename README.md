@@ -101,7 +101,8 @@ swap A/B or set `ENCODER_INVERT_DIRECTION 1`.)
   (±1800 around centre).
 - All tunables are in [`Core/Inc/wheel_config.h`](steeringwheel_firmware/Core/Inc/wheel_config.h):
   `ENCODER_COUNTS_PER_WHEEL_REV`, `WHEEL_LOCK_TO_LOCK_DEG`, `ENCODER_INVERT_DIRECTION`.
-  Belt ratio is assumed 1:1; if you add a belt reduction, change the counts-per-wheel-rev value.
+  The encoder is driven through a 20:20 gear pair (external pinion in an internal gear on the motor housing),
+  so the ratio is 1:1; verify the counts per turn on the bench (`tools/measure_counts.py`).
 - `encoder_home_to_limit_switch()` is a stub for future homing.
 
 **Pin check (PC6/PC7)** – *please verify, see "What was not verified"*:

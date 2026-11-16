@@ -6,7 +6,7 @@ Status as of 2026-11-16. Written from photos, bench output and the team's notes.
 
 PC --USB HID (USER port, PA11/PA12)--> STM32F3Discovery (F303VCT6)
 STM32 --UART (3 wires)--> MKS ODrive Mini V1.0 --> hoverboard hub motor.
-The LPD3806 encoder is wired to the ODrive (not to the STM32), and will be driven by a timing belt from the motor housing. **The belt and pulley are NOT installed yet.**
+The LPD3806 encoder is wired to the ODrive (not to the STM32), and is driven through a **gear pair**: a 20-tooth external pinion on the encoder shaft meshes with a 20-tooth internal gear on the motor housing (ratio 1:1, teeth counted by the user 2026-11-16; counts per turn still to be verified on the bench).
 Host OS for development: Linux. The ST-LINK USB port is used for flashing and board power; the wheel itself talks to the PC over the USER port.
 
 ## UART wiring (per teammate's notes; confirm with a multimeter)
@@ -37,15 +37,16 @@ USART1 is NOT yet enabled in `steeringwheel_firmware.ioc` (no CubeMX available a
 
 - Hoverboard hub motor, 15 pole pairs. The housing (outer rotor) rotates; the shaft is fixed in a vise.
 - Rotating mass about 4 kg. Housing OD about 180 mm, shaft OD 13 mm.
-- **Only 3 phase wires, no Hall sensors** (`hall_state = 7`). Commutation therefore depends entirely on the encoder through the belt. Until the belt is installed and the encoder is calibrated, closed-loop control and torque are NOT possible, and no torque command may be sent.
+- **Only 3 phase wires, no Hall sensors** (`hall_state = 7`). Commutation therefore depends entirely on the encoder through the gear pair. Until the gear mesh is verified on the bench and the encoder is calibrated, closed-loop control and torque are NOT possible, and no torque command may be sent.
 - No mechanical end stop. Lock-to-lock angle is set in software (TBD).
 
 ## Encoder
 
 - LPD3806-600BM-G5-24C (label confirmed: 600BM), quadrature A/B, no Z index, 5-24 V supply. Expected 2400 counts/rev in x4 mode.
 - Bench test: the counter works, moves smoothly in both directions with hand rotation; a rough hand count gave about 5000 per "turn", unverified (an exact marked turn is still TBD).
-- Will be driven by a timing belt from a gear on the motor housing. **TBD:** tooth counts.
-- `cpr` for the ODrive = 2400 * (teeth on housing gear / teeth on encoder pulley). It must be an integer, otherwise commutation drifts.
+- Driven by a gear pair: external pinion on the encoder shaft (20 teeth) meshing with an internal gear on the motor housing (20 teeth), ratio 1:1 (counted by the user, 2026-11-16, `belt.teeth_*` in the profile). Same rotation direction in principle, but the steering direction (`wheel.invert`) is NOT decided: check it on the bench.
+- `cpr` for the ODrive = 2400 * (teeth on housing gear / teeth on encoder pinion) = 2400 * 20/20 = **2400**. It must be an integer, otherwise commutation drifts.
+- **Still to verify on the bench:** rotate the motor housing 10 full turns and read `encoder.shadow_count` before and after: expect about 24000 counts (`tools/measure_counts.py`). The rough hand count above (about 5000 per turn) does not match 2400, so do not trust the 20:20 until the 10-turn measurement agrees. Open question: an internal gear with the same tooth count as its pinion has zero centre distance, so re-count both gears if the measurement disagrees.
 - Incremental only: wheel centre = position at power-up, or a "set centre" button.
 
 ## Power and safety state

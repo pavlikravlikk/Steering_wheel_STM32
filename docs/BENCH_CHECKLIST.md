@@ -65,13 +65,13 @@ With both boards powered but the signal wires **not** yet connected:
 ## 5. Reading the position
 1. Reset the STM32 with the ODrive connected → **LD5 goes off** within ~0.1 s; X ≈ **32768**
    (the power-up position is the centre).
-2. Belt is not fitted: turn the **encoder shaft by hand**. With the defaults (540° lock-to-lock,
+2. Gear pair 20:20 (external pinion on the encoder, internal gear on the motor housing): turn the **encoder shaft by hand** (or the housing). With the defaults (540° lock-to-lock,
    `ODRIVE_TURNS_PER_WHEEL_REV = 1`), **0.75 encoder turn = full lock** (X reaches 0 or 65535
    and clamps there). Movement must be smooth, no jumps.
    - Note: `pos_estimate` depends on the placeholder `cpr`; if 0.75 turn does not reach the end,
      the `cpr` is not 2400 — that is expected until calibration.
-3. Direction: turning clockwise should increase X. If not, set `ODRIVE_INVERT_DIRECTION 1` in
-   `wheel_config.h` (TODO(TBD) there).
+3. Direction (NOT decided by the gear count, bench step): turn the wheel **clockwise** and check that
+   X **increases**. If not, set `wheel.invert = true` in the profile (`ODRIVE_INVERT_DIRECTION 1`, TODO(TBD)).
 4. Stale handling: unplug the PA10 wire → LD5 on within ~0.1 s and X **holds** its last value.
    Re-plug → LD5 off, X follows again.
 5. Optional, with the debugger (`arm-none-eabi-gdb` + OpenOCD):
@@ -102,8 +102,9 @@ With both boards powered but the signal wires **not** yet connected:
    within ~0.25 s, X keeps working throughout (loop never blocks).
 
 ## 8. Later (needs a human decision; NOT done by this firmware)
-1. Fit the belt, count the teeth → set `ODRIVE_TURNS_PER_WHEEL_REV` (= encoder turns per wheel
-   turn) and confirm `WHEEL_LOCK_TO_LOCK_DEG`.
+1. Gear pair counted 20:20 (2026-11-16) → `ODRIVE_TURNS_PER_WHEEL_REV` = 1.0 (= encoder turns per wheel
+   turn). **Verify on the bench:** rotate the housing 10 full turns, expect about 24000 counts
+   (`tools/measure_counts.py`; the earlier rough hand count of about 5000 per turn must be explained) and confirm `WHEEL_LOCK_TO_LOCK_DEG`.
 2. Set the real `cpr`, run encoder offset calibration from `odrivetool` (by a human, motor
    free to move, supply in reach).
 3. Set a gentle ODrive profile (`current_lim`, `vel_limit`, torque limits), enable and test the

@@ -82,9 +82,10 @@ If a check fails the wheel stays DISARMED and shows the reason (section 6).
   before using FFB with the wheel mounted.**
 - With 4 kg of rotating mass and no mechanical stop, the wheel can hurt fingers, cables or
   wrists, even at 1 A. The soft end stop is only a force, not a stop.
-- Commutation depends on the belt-driven encoder. A slipping or jumping belt gives wrong
+- Commutation depends on the gear-driven encoder (20:20 pinion + internal gear). A slipping, skipping or
+  backlash-affected gear mesh gives wrong
   commutation: the motor can produce torque in an unexpected direction. Monitor the encoder
-  error and the belt; never run FFB with a loose belt.
+  error and the gear mesh; never run FFB with a loose or skipping gear.
 - The LPD3806 has no index pulse: the encoder offset calibration is (probably) needed after
   every ODrive power-up, and **the centre is the power-up position**. End stops are relative
   to that centre; power up with the wheel straight.

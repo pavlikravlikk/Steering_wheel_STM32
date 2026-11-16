@@ -82,7 +82,7 @@ Fill in: `pins.uart_tx`, `pins.uart_rx`, `uart.baud` -> `measured`.
 Failure: LD5 stays on -> TX/RX swapped, no common GND, wrong baud, UART not enabled on the
 ODrive, or the ODrive answers something non-numeric (see `docs/BENCH_CHECKLIST.md` step 5.7).
 
-## H4. Encoder counts per encoder turn (belt OFF)
+## H4. Encoder counts per encoder turn (gears apart or housing not involved)
 1. In odrivetool read `odrv0.axis0.encoder.shadow_count` (raw count, independent of `cpr`).
 2. Turn the **encoder shaft** exactly N full turns by hand (mark it; N = 3 or more), read again.
 3. `python3 tools/measure_counts.py encoder --turns 3 --start <A> --end <B>`
@@ -92,19 +92,25 @@ Success: about 2400 counts per turn, no WARNING. Fill in `encoder.ppr`, `encoder
 Failure: a different count -> the encoder is not 600 PPR or a channel is missing (count
 1200 = one channel dead: check the A/B wires and the 5 V supply of the encoder).
 
-## H5. Belt ratio and cpr (belt ON)
-1. Count the teeth on the housing gear and on the encoder pulley; enter them in
-   `belt.teeth_housing` / `belt.teeth_pulley`. Check `motor.motor_turns_per_wheel_rev`
-   (1.0 for direct drive).
+## H5. Gear ratio and cpr (gear pair meshed)
+The encoder is driven by a **20:20 gear pair** (external pinion on the encoder shaft, internal gear on
+the motor housing; counted by the user 2026-11-16, `belt.teeth_housing = belt.teeth_pulley = 20`,
+status `measured`; ratio 1:1, expected `cpr = 2400`). The section is still called `[belt]` in the profile.
+1. The tooth counts are entered. **Still verify the real counts per turn:** rotate the **motor housing**
+   exactly 10 full turns (mark it) and read `shadow_count` before and after: expect about **24000** counts
+   (an earlier rough hand count gave about 5000 per turn, which would be wrong for 1:1).
+   Check `motor.motor_turns_per_wheel_rev` (1.0 for direct drive).
 2. `python3 tools/gen_config.py --derived` -> `cpr` must be an **integer** (loud warning otherwise).
-3. Turn the **steering wheel** exactly N full turns clockwise (N >= 2), reading `shadow_count`
-   before and after:
-   `python3 tools/measure_counts.py wheel --turns 2 --start <A> --end <B> --current-cpr 2400`
+3. Turn the **steering wheel** (= motor housing) exactly N full turns clockwise (N = 10 recommended,
+   at least 2), reading `shadow_count` before and after:
+   `python3 tools/measure_counts.py wheel --turns 10 --start <A> --end <B> --current-cpr 2400`
 
-Success: no WARNING; `cpr` equals the derived one. Mark the belt fields `measured`.
+Success: no WARNING; `cpr` equals the derived one. The gear fields are already `measured` (teeth counted); this step confirms them on the bench.
 The output also says the direction: if `shadow_count` went **negative** while turning
 clockwise, set `wheel.invert = true` (confirmed again in H8).
-Failure: `implied tooth ratio ... does not match` -> re-count the teeth or check for belt slip.
+Failure: `implied tooth ratio ... does not match` or about 5000 counts per turn -> re-count both gears
+(an internal gear and its pinion normally differ clearly in tooth count) and check the mesh for slipping or
+skipping. Do not continue to H7 until the measured `cpr` is an integer equal to the profile.
 
 ## H6. Gentle ODrive profile
 1. Review the `[odrive]` section of the profile (current limit, vel limit, voltage trips,
@@ -123,6 +129,7 @@ differently; look it up in `docs/odrive_dump.txt` and adjust the path in `tools/
 (`setup_settings()`), then regenerate.
 
 ## H7. Motor and encoder offset calibration (THE MOTOR MOVES)
+Prerequisite: H5 measured `cpr` equals the profile (2400).
 **Remove the steering wheel or keep everything clear. Hand on the 24 V switch.**
 ```bash
 python3 tools/generated/odrive_calibrate.py           # asks you to type: I AM CLEAR
@@ -142,8 +149,10 @@ Failure: `CPR_POLEPAIRS_MISMATCH` -> wrong `cpr` (go back to H5) or wrong `pole_
 
 ## H8. Steering direction and lock-to-lock (default firmware)
 1. Flash the default build again (it uses the regenerated header). Power-up position = centre.
-2. `python3 tools/hid_probe.py`: turning the wheel **clockwise must increase X**; otherwise
-   set `wheel.invert = true`, rebuild.
+2. **Bench step (direction is NOT decided by the gear count):** `python3 tools/hid_probe.py`, turn the
+   wheel **clockwise** (seen from the driver) and watch X. X must **increase**; if it decreases set
+   `wheel.invert = true`, rebuild, repeat. Only then mark `wheel.invert` as `measured`. (An external pinion
+   in an internal gear turns the same way as the housing, so the default may be right, but check.)
 3. Decide `wheel.lock_to_lock_deg` (540 / 900 / 1080) and check that X reaches 0 / 65535
    exactly at half that angle each side. Mark `wheel.*` `measured`. Update `MAX_ANGLE` in
    `stm_32_wheel.py` (= lock_to_lock / 2) for the visualiser.
