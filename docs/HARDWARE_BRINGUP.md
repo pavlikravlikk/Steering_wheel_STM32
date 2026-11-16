@@ -55,8 +55,15 @@ Failure: `lsusb -d 0483:5752` empty -> USB cable on the wrong connector (ST-LINK
    ```
    Without it: `python3 tools/odrive_status.py --manual` prints the odrivetool commands; save
    the output and run `python3 tools/odrive_status.py --fixture <file> --prefix axis0`.
-3. Commit `docs/odrive_dump.txt`: it becomes the reference for the real parameter names
-   (the generated scripts skip names that do not exist on your build).
+3. A first real dump is already committed as `docs/odrive_dump.txt` (2026-11-16) and is the
+   reference for the real parameter names (`docs/DUMP_RECONCILIATION.md`). Save a fresh one
+   (`--dump-out`) after every configuration change; the generated scripts skip names that do
+   not exist on your build.
+4. Known from that dump: `axis0.error` 0x100 ENCODER_FAILED, `motor.error` 0x10
+   CONTROL_DEADLINE_MISSED, `encoder.error` 0x4 NO_RESPONSE (expected: no belt, so the startup
+   offset calibration fails), and **`startup_closed_loop_control` / `startup_encoder_offset_calibration`
+   = True in the dump** although `docs/hardware.md` says they were saved False. Re-check them
+   first; they must be False.
 
 Success: errors `0x0`, `current_state = 1 (IDLE)`, all startup flags `False`. Many `DIFF`
 lines are expected now (factory limits); `FFB precheck would FAIL` is expected.
@@ -67,7 +74,7 @@ Failure: any error register non-zero -> note the decoded names, clear them in od
 1. Multimeter checks (`docs/BENCH_CHECKLIST.md` step 4): common GND, ODrive GPIO1 idles at
    about 3.3 V, PA9 idles at about 3.3 V. Then wire **PA9 -> GPIO2**, **PA10 <- GPIO1**.
 2. Confirm the ODrive UART baud = `uart.baud` (115200) in the H2 dump
-   (`config.uart_a_baudrate` or `config.uart_baudrate`, depending on the build).
+   (`config.uart_baudrate`, saved 115200 in `docs/odrive_dump.txt`).
 3. Flash the default build (`-DSIMULATE_INPUTS=OFF -DWHEEL_FFB=OFF`), run `python3 tools/hid_probe.py`.
 
 Success: LD5 (orange) goes **off**, X = 32768 at power-up and follows the encoder shaft.
@@ -166,7 +173,7 @@ and wait 5 s, then read `odrv0.axis0.error` in odrivetool.
   boot; `u` does not move anything), or clear errors in odrivetool right before arming.
 
 ## What is verified only on the host (not on hardware)
-- All tools above: unit tests with synthetic fixtures (`tools/tests/fixtures/` are made from
-  the facts in the task, **not** from a real dump) and a fake ODrive object.
+- All tools above: unit tests against the REAL dump `docs/odrive_dump.txt` (plus truncated and
+  corrupted copies) and a fake ODrive object built from it.
 - The generated `odrive_setup.py` / `odrive_calibrate.py` were **never run** against an ODrive.
 - Property names come from the ODrive 0.5.6 documentation; your unnumbered 0.5.x build may differ.

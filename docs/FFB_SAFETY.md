@@ -47,7 +47,9 @@ All of these, in this order:
    `controller.config.control_mode` = 1 (torque); `motor.config.current_lim` <= `odrive.current_lim`
    of the profile; `controller.config.vel_limit` <= `odrive.vel_limit`; `torque_constant`
    in [0.001, 2.0]; `motor.is_calibrated`; `encoder.is_ready`; `axis0.error`, `motor.error`,
-   `encoder.error` all 0; `vbus_voltage` in [`ffb.vbus_min_v`, `ffb.vbus_max_v`]; fresh position.
+   `encoder.error` all 0; `axis0.current_state` = 1 (IDLE); `vbus_voltage` in
+   [`ffb.vbus_min_v`, `ffb.vbus_max_v`]; fresh position. All names verified against
+   `docs/odrive_dump.txt` (`tests/test_ffb_dump.c`).
 6. **ARMING:** `input_torque 0`, then `requested_state 8`, watchdog fed. The axis must report
    `current_state = 8` within 1 s (`FFB_VERIFY_CLOSED_LOOP`), else FAULT.
 7. **RUNNING.** Any fault -> FAULT (section 4).
@@ -62,7 +64,7 @@ If a check fails the wheel stays DISARMED and shows the reason (section 6).
 | Firmware writes a wrong setting | Writes restricted to 3 command kinds by an allowlist | `ffb_cmd.c` |
 | Too much current | Total command clamped to `ffb.max_amps` (<= 1 A hard cap in code); the ODrive's own `current_lim` must be <= the profile or no arming | `ffb_torque.c`, precheck |
 | Sudden jumps | Slew-rate limit (`ffb.slew_amps_per_s`, 5 A/s); RUNNING starts from 0 A | `ffb_torque.c` |
-| Wheel spinning away (no end stop, 4 kg) | Soft end stops beyond +-lock/2 with damping; OVERSPEED fault at `ffb.overspeed_turns_s`; the ODrive's `vel_limit` (<= 2 turns/s) with `enable_torque_mode_vel_limit` | `ffb_torque.c`, `ffb_safety.c`, ODrive |
+| Wheel spinning away (no end stop, 4 kg) | Soft end stops beyond +-lock/2 with damping; OVERSPEED fault at `ffb.overspeed_turns_s`; the ODrive's `vel_limit` (<= 2 turns/s) with `enable_current_mode_vel_limit` and `enable_overspeed_error` (names in this build) | `ffb_torque.c`, `ffb_safety.c`, ODrive |
 | STM32 hangs or the UART is unplugged | ODrive **watchdog** (required by the precheck) stops the axis after `watchdog_timeout` without `u 0`; on the STM32 side UART_TIMEOUT / POSITION_STALE faults | ODrive, `ffb_safety.c` |
 | Position data stale or garbage | POSITION_STALE after `ffb.stale_ms` (50 ms); strict number parser | `ffb_safety.c`, `odrive_ascii.c` |
 | ODrive reports an error / leaves closed loop | Errors and `current_state` are re-read while running (every 3rd cycle); any change -> FAULT | `ffb_precheck.c` |
@@ -86,9 +88,13 @@ If a check fails the wheel stays DISARMED and shows the reason (section 6).
 - The LPD3806 has no index pulse: the encoder offset calibration is (probably) needed after
   every ODrive power-up, and **the centre is the power-up position**. End stops are relative
   to that centre; power up with the wheel straight.
-- Brake/regen: with a lab supply and `dc_max_negative_current = -0.01 A`, back-driving the
-  motor trips the ODrive (DC_BUS_OVER_REGEN_CURRENT) - safe, but FFB stops. A brake resistor
-  changes this; review the profile then.
+- Brake/regen (from the REAL dump): `dc_max_negative_current = -3.0 A`, a **2 ohm brake
+  resistor armed automatically** (`brake_resistor_armed True`, no enable switch in this build)
+  and `max_regen_current = 0.0` (no regen current into the PSU allowed). Back-driving the
+  motor dumps energy into that resistor. Its fitting, value and power rating are unverified
+  (TBD). The Mean Well RSP-320-24 cannot sink current: if the resistor path does not absorb
+  the energy, the bus rises until the over-voltage trip (56 V saved, 30 V in the gentle
+  profile). Choosing the regen limits is a human bring-up decision (`docs/DECISIONS.md`).
 - The direction of game forces (`FFB_INVERT_HOST_FORCE`) and of the spring sign were derived
   from the conventions, not measured. Verify with small values (F5, F6).
 - Unknowns about the unnumbered ODrive 0.5.x build: whether the watchdog runs while IDLE
@@ -109,7 +115,8 @@ Pre-arm reasons (N): 1 ARM_NOT_ALLOWED, 2 PROFILE_TBD, 3 SIMULATION_BUILD, 4 POS
 5 READ_TIMEOUT, 6 WATCHDOG_DISABLED, 7 WATCHDOG_TIMEOUT_RANGE, 8 CONTROL_MODE,
 9 CURRENT_LIM_HIGH, 10 VEL_LIMIT_HIGH, 11 MOTOR_NOT_CALIBRATED, 12 ENCODER_NOT_READY,
 13 AXIS_ERROR, 14 MOTOR_ERROR, 15 ENCODER_ERROR, 16 VBUS_RANGE, 17 TORQUE_CONSTANT_RANGE,
-18 NOT_CHECKED_YET, 19 READ_ERROR.
+18 NOT_CHECKED_YET, 19 READ_ERROR, 20 NOT_IDLE (axis not IDLE before arming, e.g.
+because `startup_closed_loop_control` is True).
 Faults (N): 1 POSITION_STALE, 2 ODRIVE_ERROR, 3 UART_TIMEOUT, 4 VBUS_RANGE,
 5 WATCHDOG_FEED_FAILED, 6 TORQUE_INVALID, 7 OVERSPEED, 8 ARMING_TIMEOUT, 9 LOOP_OVERRUN,
 10 READ_FAILED, 11 INTERNAL.

@@ -48,9 +48,9 @@ ODrive is powered.
    `odrv0.axis0.current_state` → `1` (IDLE); `odrv0.axis0.error`, `.motor.error`,
    `.encoder.error` → `0`; `odrv0.axis0.config.startup_closed_loop_control` and
    `startup_encoder_offset_calibration` → `False`.
-2. Confirm the UART is enabled at 115200 on GPIO1/GPIO2. The property names differ between
-   0.5.x builds (TBD for your unnumbered firmware), e.g. `odrv0.config.enable_uart_a` /
-   `uart_a_baudrate`, or `enable_uart` / `uart_baudrate` on older 0.5.x.
+2. Confirm the UART is enabled at 115200 on GPIO1/GPIO2: in this build (see
+   `docs/odrive_dump.txt`) the names are `odrv0.config.enable_uart` (saved True) and
+   `odrv0.config.uart_baudrate` (saved 115200).
 3. Optional, isolates the ODrive from the STM32: a **3.3 V** USB-UART adapter on GPIO1/GPIO2/GND,
    `picocom -b 115200 --omap crlf --echo /dev/ttyUSB0`, type `f 0` + Enter → a line like
    `0.000000 0.000000`. Type only `f 0` / `r ...` commands.

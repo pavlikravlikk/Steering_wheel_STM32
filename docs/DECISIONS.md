@@ -67,9 +67,8 @@ One line per decision: **what** — why — how to change it.
   `tests/test_safety.c` forbids those names in firmware sources outside `ffb/`. — keep the guard strict — n/a.
 - Gentle-profile values chosen (all `TBD`): `current_lim` 4 A, `calibration_current` 3 A, `vel_limit`
   2 turns/s, over/under-voltage trip 30/18 V, `dc_max_positive_current` 6 A, `dc_max_negative_current`
-  **-0.01 A** (0.5.x default; a lab supply cannot sink regen current, so regen trips and disarms rather than
-  pumping the bus), watchdog 0.25 s enabled, `control_mode` = torque (1), `input_mode` = passthrough (1),
-  `enable_torque_mode_vel_limit` = true. — conservative — profile.
+  ~~-0.01 A~~ **superseded: the real saved value is -3.0 A, see "Reconciliation with the real dump" below**, watchdog 0.25 s enabled, `control_mode` = torque (1), `input_mode` = passthrough (1),
+  ~~`enable_torque_mode_vel_limit`~~ `enable_current_mode_vel_limit` (name in this build) = true. — conservative — profile.
 - `odrive_setup.py` also writes `startup_closed_loop_control = False` and
   `startup_encoder_offset_calibration = False` (already False; writing False is defensive). It never touches
   `requested_state`, never saves without `--save`, refuses unless IDLE and vbus in the FFB window, verifies by
@@ -82,8 +81,8 @@ One line per decision: **what** — why — how to change it.
   axis bits labelled as such. Licence: documentation facts, own code. — unnumbered firmware — verify against
   `odrivetool`'s output.
 - `tools/odrive_status.py` accepts flat (`a.b = v`) and odrivetool tree dumps; `--live` uses only `getattr`.
-  `docs/odrive_dump.txt` did not exist, so the test fixtures in `tools/tests/fixtures/` are **synthetic**,
-  built from the facts in the task, and labelled so. — no hardware — replace with the real dump in H2.
+  ~~synthetic fixtures~~ **superseded: the synthetic fixtures were deleted; tests now use the real
+  `docs/odrive_dump.txt`** (see below).
 - `tools/hid_probe.py` defines the FFB status feature report layout (ID 0x40, 16 bytes) that the firmware
   implements; a unit test parses `Core/Inc/ffb/ffb_safety.h` to keep the enum tables in sync. — single
   definition checked both ways — n/a.
@@ -168,3 +167,46 @@ One line per decision: **what** — why — how to change it.
   gesture); bus recovery must be a state machine (one SCL edge per 1 ms tick), never a busy loop.
 - Settings field renamed `force_gain` (not `ffb_gain`): `tests/test_safety.c` forbids `ffb_` identifiers outside
   `#if WHEEL_FFB` in non-ffb files - the check is strict on purpose.
+
+---
+
+# Reconciliation with the real dump (2026-11-16, after `docs/hardware.md` + `docs/odrive_dump.txt` were added)
+
+Full table: `docs/DUMP_RECONCILIATION.md`. Decisions:
+- **`docs/odrive_dump.txt` is the source of truth** for names, types and current saved values. The synthetic fixtures were
+  deleted; Python and C tests now read the real file (`tools/tests/test_odrive_status.py`, `tests/test_ffb_dump.c`),
+  plus truncated/corrupted copies. — owner's instruction — n/a.
+- **Dump parser** moved to `tools/odrive_dump.py` (shared by the doctor and, embedded, by `odrive_setup.py`): understands
+  the IPython session (`In [n]: odrv0.x` sets the path prefix), skips `name: ...` placeholders and method signatures, and
+  reports malformed/unplaceable lines instead of silently using them. — real format — n/a.
+- **Regen / brake (correction).** Earlier I assumed `dc_max_negative_current = -0.01 A` (factory default). The real saved
+  value is **-3.0 A**. Together with `brake_resistance = 2.0 ohm`, `brake_resistor_armed = True` (no enable switch exists in
+  this build: the resistor is armed automatically) and `max_regen_current = 0.0`, this means, as far as the 0.5.x design
+  is understood: energy coming back from the motor (the user back-driving the wheel against the force, or the rotor
+  braking) is meant to be burnt in the 2 ohm resistor, with no current allowed back into the PSU; a net negative bus
+  current beyond 3 A trips DC_BUS_OVER_REGEN_CURRENT. The Mean Well RSP-320-24 **cannot sink current**: if the resistor is
+  missing, open, undersized or not switched, the bus voltage rises until the over-voltage trip (saved 56 V, which is above
+  what the 24 V supply side should ever see; the gentle profile proposes 30 V). The resistor's presence, value and power
+  rating on this MKS board are **unverified**. At 24 V a 2 ohm resistor can take up to 12 A / 288 W while braking.
+  **Choosing new regen limits (and `max_regen_current`) is a human decision at bring-up.** What changed: the profile now
+  holds the saved value -3.0 (status TBD, so `odrive_setup.py` proposes no change), `brake_resistance` 2.0 and
+  `max_regen_current` 0.0 are new profile entries that are **check-only** (compared by the doctor, never written by any
+  script), and the FFB precheck is unchanged (the profile gate blocks arming while these are TBD).
+- **Renamed** `enable_torque_mode_vel_limit` -> `enable_current_mode_vel_limit` (the name in this build; the old name would
+  have been silently skipped by the setup script). Added `enable_overspeed_error` (saved True) to the profile/setup.
+- **New pre-arm condition** `axis0.current_state == 1 (IDLE)` -> reason `NOT_IDLE` (20). The dump shows
+  `startup_closed_loop_control = True`; with that the axis can already be in closed loop when the user arms, which the
+  old precheck would not have noticed. Firmware still never writes startup flags; the doctor reports them as ERROR.
+  `FFB_VERIFY_CLOSED_LOOP` TODO(TBD) resolved: `axis0.current_state` exists (int32).
+- **UART**: `config.enable_uart = True`, `config.uart_baudrate = 115200` -> profile `uart.baud` status `measured`;
+  the doctor now reads exactly these names (the guessed `uart_a_*` names are only optional fallbacks).
+- **Profile statuses changed to measured**: `odrive.axis` (motor calibrated on axis0), `motor.phase_resistance`
+  (0.166108 ohm), `uart.baud`. Everything else stays TBD (a saved value is not a decision).
+- **Firmware generation**: fw 0.0.0 "unreleased", hw 3.6-56; the property set (`enable_uart`, `max_regen_current`,
+  `enable_current_mode_vel_limit`, no device-level `error`) is an **early 0.5.x (0.5.1-like) API**. The error bits present in
+  the dump decode identically in the 0.5.1 and 0.5.6 tables as far as known; legacy-only names are shown as "unverified".
+- `calibration_current`: the motor calibration succeeded with the saved 5 A; the profile's 3 A is kept as a gentle start
+  for the encoder offset calibration, but if that calibration fails to move the 4 kg rotor, 5 A is the known-working value
+  (human decision).
+- `motor.config.direction = -1` and `encoder.config.offset = -9298` are stale results of an earlier calibration; they are
+  rewritten by the next encoder offset calibration. Nothing in our code writes them.
