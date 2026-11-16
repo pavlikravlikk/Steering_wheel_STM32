@@ -17,6 +17,9 @@ FW_SRCS := $(FW)/Src/hid_pack.c \
            $(FW)/Src/axis_shape.c \
            $(FW)/Src/board_health.c
 CFLAGS  += -DBOARD_HEALTH_HOST
+# The link tests use fixed numbers computed for a 540 deg lock-to-lock. Pin it here so the tests do not
+# change when the profile (config/hardware_profile.toml, now 900 deg) is edited.
+CFLAGS  += -DWHEEL_LOCK_TO_LOCK_DEG=540
 
 # Pure force-feedback modules (Core/Src/ffb). ffb_board.c and usbd_ffb_hid.c
 # are hardware glue and are only compiled into the firmware.

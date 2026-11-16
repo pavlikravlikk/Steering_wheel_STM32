@@ -153,9 +153,9 @@ Failure: `CPR_POLEPAIRS_MISMATCH` -> wrong `cpr` (go back to H5) or wrong `pole_
    wheel **clockwise** (seen from the driver) and watch X. X must **increase**; if it decreases set
    `wheel.invert = true`, rebuild, repeat. Only then mark `wheel.invert` as `measured`. (An external pinion
    in an internal gear turns the same way as the housing, so the default may be right, but check.)
-3. Decide `wheel.lock_to_lock_deg` (540 / 900 / 1080) and check that X reaches 0 / 65535
+3. `wheel.lock_to_lock_deg` is 900 (owner decision 2026-11-16, `assumed`): check that X reaches 0 / 65535
    exactly at half that angle each side. Mark `wheel.*` `measured`. Update `MAX_ANGLE` in
-   `stm_32_wheel.py` (= lock_to_lock / 2) for the visualiser.
+   `stm_32_wheel.py` (= lock_to_lock / 2 = 450, already set) for the visualiser.
 4. Hold **B1** for 1 s away from centre: LD9 toggles, X jumps to 32768.
 
 ## H9. MCP23017 buttons

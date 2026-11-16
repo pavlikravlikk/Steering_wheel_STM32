@@ -97,8 +97,8 @@ swap A/B or set `ENCODER_INVERT_DIRECTION 1`.)
 - TIM3 is 16-bit. The firmware reads `CNT` every 1 ms and accumulates the signed `int16`
   delta into an `int32`. The position at power-up is the centre (zero at boot).
 - Axis mapping: `X = 32768 + counts × 65535 / ENCODER_COUNTS_FULL_RANGE`, clamped to
-  0..65535. Defaults: 2400 counts/rev, 540° lock-to-lock → 3600 counts for the full range
-  (±1800 around centre).
+  0..65535. Profile values: 2400 counts/rev, 900° lock-to-lock → 6000 counts for the full range
+  (±3000 around centre); the old firmware default was 540° (3600 counts).
 - All tunables are in [`Core/Inc/wheel_config.h`](steeringwheel_firmware/Core/Inc/wheel_config.h):
   `ENCODER_COUNTS_PER_WHEEL_REV`, `WHEEL_LOCK_TO_LOCK_DEG`, `ENCODER_INVERT_DIRECTION`.
   The encoder is driven through a 20:20 gear pair (external pinion in an internal gear on the motor housing),

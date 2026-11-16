@@ -623,7 +623,7 @@ TEST(test_torque_defaults_are_gentle)
   CHECK(c.max_amps <= FFB_HARD_CAP_AMPS);
   CHECK(c.max_amps <= 1.0f);
   CHECK(c.spring_kp <= 1.0f);
-  CHECK_NEAR(c.half_range_turns, 0.75, 1e-6);      /* 540 deg lock-to-lock */
+  CHECK_NEAR(c.half_range_turns, WHEEL_LOCK_TO_LOCK_DEG / 720.0, 1e-6);  /* half of the lock-to-lock (tests pin 540 deg: 0.75 turn) */
 }
 
 TEST(test_torque_spring_damper_friction_signs)

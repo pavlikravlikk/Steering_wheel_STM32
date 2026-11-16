@@ -58,7 +58,7 @@ class TestProfile(unittest.TestCase):
         self.assertEqual(d["encoder_counts_per_wheel_rev"], 2400)
         self.assertEqual(d["odrive_turns_per_wheel_rev"], 1.0)
         h = gen_config.gen_header(load())
-        for needle in ("#define ENCODER_COUNTS_PER_WHEEL_REV  2400", "#define WHEEL_LOCK_TO_LOCK_DEG        540",
+        for needle in ("#define ENCODER_COUNTS_PER_WHEEL_REV  2400", "#define WHEEL_LOCK_TO_LOCK_DEG        900",
                        "#define ODRIVE_TURNS_PER_WHEEL_REV    1.0f", "#define ODRIVE_UART_BAUD              115200U",
                        "#define MCP23017_I2C_ADDR_7BIT        0x20U", "#define ODRIVE_INVERT_DIRECTION       0"):
             self.assertIn(needle, h)

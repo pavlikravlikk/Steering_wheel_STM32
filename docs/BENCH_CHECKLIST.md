@@ -65,10 +65,10 @@ With both boards powered but the signal wires **not** yet connected:
 ## 5. Reading the position
 1. Reset the STM32 with the ODrive connected → **LD5 goes off** within ~0.1 s; X ≈ **32768**
    (the power-up position is the centre).
-2. Gear pair 20:20 (external pinion on the encoder, internal gear on the motor housing): turn the **encoder shaft by hand** (or the housing). With the defaults (540° lock-to-lock,
-   `ODRIVE_TURNS_PER_WHEEL_REV = 1`), **0.75 encoder turn = full lock** (X reaches 0 or 65535
+2. Gear pair 20:20 (external pinion on the encoder, internal gear on the motor housing): turn the **encoder shaft by hand** (or the housing). With the profile (900° lock-to-lock,
+   `ODRIVE_TURNS_PER_WHEEL_REV = 1`), **1.25 encoder turns = full lock** (450° each side) (X reaches 0 or 65535
    and clamps there). Movement must be smooth, no jumps.
-   - Note: `pos_estimate` depends on the placeholder `cpr`; if 0.75 turn does not reach the end,
+   - Note: `pos_estimate` depends on the placeholder `cpr`; if 1.25 turns do not reach the end,
      the `cpr` is not 2400 — that is expected until calibration.
 3. Direction (NOT decided by the gear count, bench step): turn the wheel **clockwise** and check that
    X **increases**. If not, set `wheel.invert = true` in the profile (`ODRIVE_INVERT_DIRECTION 1`, TODO(TBD)).
@@ -88,8 +88,8 @@ With both boards powered but the signal wires **not** yet connected:
 ## 6. Set centre
 1. Turn the encoder away from centre, hold **B1 ≥ 1 s** → **LD9 (blue) toggles**, X jumps to
    32768. A short press does nothing. Holding longer does not repeat it.
-2. `python stm_32_wheel.py` → the wheel display follows the encoder (`MAX_ANGLE = 270` matches
-   the 540° default).
+2. `python stm_32_wheel.py` → the wheel display follows the encoder (`MAX_ANGLE = 450` matches
+   the 900° profile value).
 
 ## 7. MCP23017 buttons (when the board exists)
 1. Wiring: VDD = **3.3 V** (the bus is shared with the 3.3 V LSM303), VSS = GND, SCL = PB6,

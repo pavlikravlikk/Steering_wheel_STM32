@@ -21,7 +21,7 @@ AXIS_MAX = 65535
 AXIS_CENTER = AXIS_MAX / 2   # raw X value with the wheel straight
 NUM_BUTTONS = 16             # HID buttons 1..16 (1..10 wired: 8 buttons + 2 paddles)
 WIRED_BUTTONS = 10
-MAX_ANGLE = 270.0            # display angle per side (540 deg lock-to-lock)
+MAX_ANGLE = 450.0            # display angle per side (900 deg lock-to-lock)
 INVERT = False               # True if the wheel turns the wrong way
 RESPONSE = 14.0              # smoothing speed (higher = snappier)
 

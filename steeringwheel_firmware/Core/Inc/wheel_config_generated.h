@@ -5,8 +5,8 @@
 #define WHEEL_CONFIG_GENERATED_H
 
 #define PROFILE_VERSION               1
-#define PROFILE_TBD_COUNT             26U   /* entries still marked TBD          */
-#define PROFILE_SAFETY_TBD_COUNT      21U   /* ...in belt/encoder/motor/odrive/wheel/uart */
+#define PROFILE_TBD_COUNT             25U   /* entries still marked TBD          */
+#define PROFILE_SAFETY_TBD_COUNT      20U   /* ...in belt/encoder/motor/odrive/wheel/uart */
 /* List of TBD entries: make status (tools/project_status.py). */
 
 /* --- encoder / belt / steering ------------------------------------- */
@@ -29,7 +29,7 @@
 #define ENCODER_COUNTS_PER_WHEEL_REV  2400   /* STM32 TIM3 fallback source */
 #endif
 #ifndef WHEEL_LOCK_TO_LOCK_DEG
-#define WHEEL_LOCK_TO_LOCK_DEG        540
+#define WHEEL_LOCK_TO_LOCK_DEG        900
 #endif
 #ifndef ENCODER_INVERT_DIRECTION
 #define ENCODER_INVERT_DIRECTION      0

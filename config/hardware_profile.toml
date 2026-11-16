@@ -73,7 +73,7 @@ encoder_mode                 = { value = 0, status = "TBD", how_to_measure = "EN
 
 # -----------------------------------------------------------------------------
 [wheel]
-lock_to_lock_deg = { value = 540, status = "TBD", how_to_measure = "Total steering angle from full left to full right, in degrees (design choice; 540 / 900 / 1080 are common)." }
+lock_to_lock_deg = { value = 900, status = "assumed", note = "owner decision 2026-11-16: 900 deg total (+-450), the common default of most games; the owner first said 540 per side = 1080", how_to_measure = "Total steering angle from full left to full right, in degrees (design choice, 900 = +-450). Bench check (H8): X must reach 0 / 65535 at exactly 450 deg each side." }
 invert           = { value = false, status = "TBD", how_to_measure = "Turn the wheel clockwise (seen from the driver). HID X must increase. If it decreases set true." }
 centre_mode      = { value = "power_up", status = "assumed", how_to_measure = "power_up = the position at boot is the centre; B1 held 1 s re-centres. (Only option for now; no index pulse.)" }
 
