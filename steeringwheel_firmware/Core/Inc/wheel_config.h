@@ -133,9 +133,10 @@
 #define ODRIVE_STALE_MS               100U
 #endif
 
-/* TODO(TBD): ODrive "turns" (encoder turns through the placeholder cpr) per
- * one turn of the wheel. Depends on the belt tooth ratio, which is unknown
- * until the belt is installed. 1.0 = encoder turns 1:1 with the wheel. */
+/* ODrive "turns" per one turn of the wheel. Normally set by the profile
+ * (motor.motor_turns_per_wheel_rev; ODrive turns = motor turns once
+ * axis0.encoder.config.cpr = counts per MOTOR turn, see gen_config.py).
+ * TODO(TBD): measure (tools/measure_counts.py). Fallback 1.0 = direct drive. */
 #ifndef ODRIVE_TURNS_PER_WHEEL_REV
 #define ODRIVE_TURNS_PER_WHEEL_REV    1.0f
 #endif
