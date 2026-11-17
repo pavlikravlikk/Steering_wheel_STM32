@@ -398,13 +398,16 @@ TEST(test_svc_spring_sign_units_and_slew)
     ffb_service_cfg_t c = cfg_armable();
     int from;
     float last = 0.0f;
+    float ang;
     mock_ready();
     M.torque_constant = kts[k];
     T = 0;
     ffb_service_init(&s, &c, &k_io, T);
     to_running(&s);
     CHECK_EQ_INT(s.sm.state, FFB_STATE_RUNNING);
-    M.angle = 0.4f;                         /* 0.4 wheel turn to one side */
+    /* up to 0.4 wheel turn to one side, but small enough that the spring stays below the clamp for ANY profile */
+    ang = (0.4f * FFB_SPRING_KP > 0.5f * FFB_MAX_AMPS) ? (0.5f * FFB_MAX_AMPS / FFB_SPRING_KP) : 0.4f;
+    M.angle = ang;
     from = M.nwrites;
     run_ms(&s, 2000, false, 0);
     for (int i = from; i < M.nwrites; i++)
@@ -418,8 +421,8 @@ TEST(test_svc_spring_sign_units_and_slew)
       }
     }
     /* settled value = -kp * angle * kt (inside the end stops, no motion) */
-    CHECK_NEAR(last, -FFB_SPRING_KP * 0.4f * kts[k], 1e-3 + 1e-4 * kts[k]);
-    CHECK_NEAR(s.last_amps, -FFB_SPRING_KP * 0.4f, 1e-3);
+    CHECK_NEAR(last, -FFB_SPRING_KP * ang * kts[k], 1e-3 + 1e-4 * kts[k]);
+    CHECK_NEAR(s.last_amps, -FFB_SPRING_KP * ang, 1e-3);
   }
 }
 

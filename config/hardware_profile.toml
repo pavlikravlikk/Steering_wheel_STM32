@@ -90,9 +90,9 @@ active_low   = { value = true, status = "TBD", how_to_measure = "Buttons switch 
 # -----------------------------------------------------------------------------
 [ffb]
 # Force feedback limits (used only when the firmware is built with -DWHEEL_FFB=ON).
-max_amps                = { value = 0.3, status = "assumed", note = "F5 first-arm value (docs/FFB_SAFETY.md section 8): 0.3 A, wheel dismounted; raise only in small steps after F5-F7", how_to_measure = "Hard cap of the total commanded current (A). The firmware also has a compile-time ceiling of 1.0 A (FFB_HARD_CAP_AMPS in Core/Inc/ffb/ffb_config.h)." }
+max_amps                = { value = 0.5, status = "assumed", note = "F5 step 2 (owner decision 2026-11-17): 0.5 A (about 0.25 Nm), wheel dismounted. Step 1 (0.3 A, spring 0.2 A/turn) armed and ran correctly but the force (about 0.1 Nm) was too small to feel, so the physical sign of the spring could not be judged. Raise only in small steps", how_to_measure = "Hard cap of the total commanded current (A). The firmware also has a compile-time ceiling of 1.0 A (FFB_HARD_CAP_AMPS in Core/Inc/ffb/ffb_config.h)." }
 slew_amps_per_s         = { value = 5.0, status = "assumed", how_to_measure = "Maximum change of the commanded current per second." }
-spring_kp_amps_per_turn = { value = 0.2, status = "assumed", note = "F5 first-arm value (docs/FFB_SAFETY.md section 8)", how_to_measure = "Centring spring, A per wheel turn away from centre. Gentle." }
+spring_kp_amps_per_turn = { value = 1.5, status = "assumed", note = "F5 step 2 (owner decision 2026-11-17): reaches max_amps 0.5 A at about 0.33 turn (120 deg) so the direction of the pull is unmistakable. Step 1 value was 0.2 A/turn", how_to_measure = "Centring spring, A per wheel turn away from centre. Gentle." }
 damper_amps_per_turn_s  = { value = 0.05, status = "assumed", how_to_measure = "A per (wheel turn/s)." }
 friction_amps           = { value = 0.03, status = "assumed", how_to_measure = "Constant friction-like force (A) opposing motion." }
 inertia_amps_per_turn_s2 = { value = 0.0, status = "assumed", how_to_measure = "Inertia compensation placeholder (0 = off)." }
