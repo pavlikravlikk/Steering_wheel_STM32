@@ -250,8 +250,9 @@ class TestSetupScript(unittest.TestCase):
         vals["axis0.controller.config.vel_limit"] = 50.0
         odrv = FakeODrive(vals)
         self.assertEqual(self.mod.apply(odrv, write=True, out=lambda s: None), 0)
-        self.assertEqual(sorted(odrv.writes), [("axis0.controller.config.vel_limit", 2.0),
-                                               ("axis0.motor.config.current_lim", 4.0)])
+        self.assertEqual(sorted(odrv.writes),
+                         [("axis0.controller.config.vel_limit", gen_config.val(self.p, "odrive", "vel_limit")),
+                          ("axis0.motor.config.current_lim", gen_config.val(self.p, "odrive", "current_lim"))])
         self.assertEqual(odrv.calls, [])
 
     def test_apply_save_only_with_flag(self):

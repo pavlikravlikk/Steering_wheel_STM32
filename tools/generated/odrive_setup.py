@@ -27,7 +27,7 @@ SETTINGS = [
     ('axis0.encoder.config.mode', 0),
     ('axis0.encoder.config.cpr', 2400),
     ('axis0.encoder.config.use_index', False),
-    ('axis0.controller.config.vel_limit', 2.0),
+    ('axis0.controller.config.vel_limit', 4.0),
     ('axis0.controller.config.vel_gain', 0.25),
     ('axis0.controller.config.enable_current_mode_vel_limit', True),
     ('axis0.controller.config.enable_overspeed_error', True),

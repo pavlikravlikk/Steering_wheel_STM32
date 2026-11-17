@@ -87,7 +87,7 @@
 #define FFB_ENDSTOP_DAMPING           0.3f
 #endif
 #ifndef FFB_OVERSPEED_TURNS_S
-#define FFB_OVERSPEED_TURNS_S         3.0f   /* wheel turns/s */
+#define FFB_OVERSPEED_TURNS_S         5.0f   /* wheel turns/s */
 #endif
 #ifndef FFB_VBUS_MIN_V
 #define FFB_VBUS_MIN_V                20.0f
@@ -114,7 +114,7 @@
 #define FFB_PRECHECK_CURRENT_LIM_MAX  4.0f   /* live value must be <= this */
 #endif
 #ifndef FFB_PRECHECK_VEL_LIMIT_MAX
-#define FFB_PRECHECK_VEL_LIMIT_MAX    2.0f   /* live value must be <= this */
+#define FFB_PRECHECK_VEL_LIMIT_MAX    4.0f   /* live value must be <= this */
 #endif
 
 #endif /* WHEEL_CONFIG_GENERATED_H */
