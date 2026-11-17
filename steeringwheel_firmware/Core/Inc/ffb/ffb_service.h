@@ -62,6 +62,7 @@ typedef struct
   bool     simulation;         /* SIMULATE_INPUTS: never touch the ODrive   */
   bool     invert;             /* ODRIVE_INVERT_DIRECTION (HID X frame)     */
   bool     invert_host;        /* FFB_INVERT_HOST_FORCE                     */
+  float    host_gain;          /* FFB_HOST_GAIN: game force x gain, THEN clamped to +-1 (max_amps stays the cap) */
   bool     verify_closed_loop; /* FFB_VERIFY_CLOSED_LOOP                    */
   bool     spring_only_without_host;
   uint32_t profile_safety_tbd; /* PROFILE_SAFETY_TBD_COUNT                  */

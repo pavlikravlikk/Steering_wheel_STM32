@@ -30,6 +30,7 @@ void ffb_service_default_cfg(ffb_service_cfg_t *cfg)
   cfg->simulation = (SIMULATE_INPUTS != 0);
   cfg->invert = (ODRIVE_INVERT_DIRECTION != 0);
   cfg->invert_host = (FFB_INVERT_HOST_FORCE != 0);
+  cfg->host_gain = FFB_HOST_GAIN;
   cfg->verify_closed_loop = (FFB_VERIFY_CLOSED_LOOP != 0);
   cfg->spring_only_without_host = (FFB_SPRING_ONLY_WITHOUT_HOST != 0);
   cfg->profile_safety_tbd = PROFILE_SAFETY_TBD_COUNT;
@@ -304,7 +305,9 @@ void ffb_service_cycle(ffb_service_t *s, uint32_t now_ms)
       const float half = (s->tcfg.half_range_turns > 0.0f) ? s->tcfg.half_range_turns : 1.0f;
       host = s->io->host_force(now_ms, clamp1(sign * angle / half),
                                clamp1(sign * vel / FFB_OVERSPEED_TURNS_S), &active);
-      host = finite_f(host) ? clamp1(host) * FFB_MAX_AMPS * hsign : host;  /* NaN stays NaN */
+      /* The game scales its force for a strong wheel; host_gain amplifies it here and the clamp keeps max_amps as the
+       * cap (NaN stays NaN and is caught later as TORQUE_INVALID). */
+      host = finite_f(host) ? clamp1(host * s->cfg.host_gain) * FFB_MAX_AMPS * hsign : host;
     }
     s->host_active = active;
     if (!ffb_torque_step(&s->tcfg, &s->tst, &ax, host,

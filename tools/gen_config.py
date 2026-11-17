@@ -65,6 +65,7 @@ RANGES = [
     ("mcp23017", "address_7bit", int, 0x20, 0x27),
     ("ffb", "max_amps", float, 0.0, 1.0),
     ("ffb", "slew_amps_per_s", float, 0.01, 1000.0),
+    ("ffb", "host_gain", float, 0.1, 10.0),
     ("ffb", "spring_kp_amps_per_turn", float, 0.0, 20.0),
     ("ffb", "damper_amps_per_turn_s", float, 0.0, 20.0),
     ("ffb", "friction_amps", float, 0.0, 1.0),
@@ -334,6 +335,7 @@ def gen_header(p):
     o = lambda k: val(p, "odrive", k)  # noqa: E731
     m("FFB_PROFILE_MAX_AMPS", c_float(f("max_amps")))
     m("FFB_SLEW_AMPS_PER_S", c_float(f("slew_amps_per_s")))
+    m("FFB_HOST_GAIN", c_float(f("host_gain")), "game force x gain, then clamped (max_amps is still the cap)")
     m("FFB_SPRING_KP", c_float(f("spring_kp_amps_per_turn")), "A per wheel turn")
     m("FFB_DAMPER_KD", c_float(f("damper_amps_per_turn_s")), "A per wheel turn/s")
     m("FFB_FRICTION_AMPS", c_float(f("friction_amps")))

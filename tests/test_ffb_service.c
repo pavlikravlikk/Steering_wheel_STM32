@@ -449,6 +449,7 @@ TEST(test_svc_host_force_direction_and_actuators)
 {
   ffb_service_t s;
   ffb_service_cfg_t c = cfg_armable();
+  c.host_gain = 1.0f;                        /* pinned: this test is about direction, the gain has its own test */
   mock_ready();
   T = 0;
   ffb_service_init(&s, &c, &k_io, T);
@@ -479,6 +480,33 @@ TEST(test_svc_host_force_direction_and_actuators)
   run_ms(&s, 50, false, 0);
   CHECK_EQ_INT(s.sm.state, FFB_STATE_FAULT);
   CHECK_EQ_INT(s.sm.fault, FFB_FAULT_TORQUE_INVALID);
+}
+
+/* host_gain amplifies the game force BEFORE the clamp: weak game forces get stronger, the cap (max_amps) does not move. */
+TEST(test_svc_host_gain_scales_before_the_clamp)
+{
+  const float gains[] = { 1.0f, 3.0f, 10.0f };
+  for (unsigned k = 0; k < 3; k++)
+  {
+    ffb_service_t s;
+    ffb_service_cfg_t c = cfg_armable();
+    float want;
+    mock_ready();
+    T = 0;
+    c.host_gain = gains[k];
+    ffb_service_init(&s, &c, &k_io, T);
+    to_running(&s);
+    M.host_on = true;
+    M.host = 0.1f;                               /* a weak game force: 10 percent of the full scale */
+    run_ms(&s, 1000, false, 0);
+    want = 0.1f * gains[k];
+    if (want > 1.0f) want = 1.0f;                /* the clamp comes AFTER the gain */
+    CHECK_NEAR(fabsf(s.last_amps), want * FFB_MAX_AMPS, 1e-3);
+    CHECK(fabsf(s.last_amps) <= FFB_MAX_AMPS + 1e-6f);   /* never above the cap, whatever the gain */
+    M.host = 1.0f;                               /* a full-scale game force never exceeds the cap */
+    run_ms(&s, 1000, false, 0);
+    CHECK_NEAR(fabsf(s.last_amps), FFB_MAX_AMPS, 1e-3);
+  }
 }
 
 /* After a fault: urgent torque 0 then IDLE, and never again a feed or a
@@ -663,6 +691,7 @@ void run_ffb_service_tests(void)
   RUN(test_svc_spring_sign_units_and_slew);
   RUN(test_svc_loop_time_ignores_a_micros_wrap);
   RUN(test_svc_host_force_direction_and_actuators);
+  RUN(test_svc_host_gain_scales_before_the_clamp);
   RUN(test_svc_every_runtime_fault);
   RUN(test_svc_closed_loop_refused_gives_arming_timeout);
   RUN(test_svc_user_disarm_with_b1);
