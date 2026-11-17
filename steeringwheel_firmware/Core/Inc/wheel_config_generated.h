@@ -60,7 +60,7 @@
 #define FFB_PROFILE_MAX_AMPS          0.8f
 #endif
 #ifndef FFB_SLEW_AMPS_PER_S
-#define FFB_SLEW_AMPS_PER_S           5.0f
+#define FFB_SLEW_AMPS_PER_S           50.0f
 #endif
 #ifndef FFB_SPRING_KP
 #define FFB_SPRING_KP                 1.5f   /* A per wheel turn */
