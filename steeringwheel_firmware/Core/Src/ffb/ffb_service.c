@@ -396,10 +396,16 @@ void ffb_service_cycle(ffb_service_t *s, uint32_t now_ms)
   }
   if (s->io->micros != NULL)
   {
-    const uint32_t dt = s->io->micros() - t0;
-    if (dt > s->cycle_us_max)
+    /* The board's micros() is CYCCNT / 72 and wraps about every 60 s (not at 2^32): a cycle that straddles the wrap
+     * would give a huge difference (bench 2026-11-17: loop_max stuck at 65535). Such a sample is dropped. */
+    const uint32_t t1 = s->io->micros();
+    if (t1 >= t0)
     {
-      s->cycle_us_max = dt;
+      const uint32_t dt = t1 - t0;
+      if (dt > s->cycle_us_max)
+      {
+        s->cycle_us_max = dt;
+      }
     }
   }
 }

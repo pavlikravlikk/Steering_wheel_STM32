@@ -426,6 +426,25 @@ TEST(test_svc_spring_sign_units_and_slew)
   }
 }
 
+/* micros() that is large at the start of every cycle and small at its end (the ~60 s wrap of CYCCNT / 72) */
+static uint32_t s_wrap_calls;
+static uint32_t io_micros_wrapping(void) { return ((s_wrap_calls++ & 1U) == 0U) ? 59999990U : 10U; }
+
+TEST(test_svc_loop_time_ignores_a_micros_wrap)
+{
+  ffb_service_t s;
+  ffb_service_cfg_t c = cfg_armable();
+  ffb_io_t io = k_io;
+  mock_ready();
+  T = 0;
+  s_wrap_calls = 0;
+  io.micros = io_micros_wrapping;
+  ffb_service_init(&s, &c, &io, T);
+  run_ms(&s, 200, false, 0);
+  CHECK(s_wrap_calls >= 2U);
+  CHECK_EQ_INT((int)s.cycle_us_max, 0);        /* the wrapped samples are dropped, not 4 billion */
+}
+
 TEST(test_svc_host_force_direction_and_actuators)
 {
   ffb_service_t s;
@@ -642,6 +661,7 @@ void run_ffb_service_tests(void)
   RUN(test_svc_read_errors_block);
   RUN(test_svc_full_arm_sequence_and_order);
   RUN(test_svc_spring_sign_units_and_slew);
+  RUN(test_svc_loop_time_ignores_a_micros_wrap);
   RUN(test_svc_host_force_direction_and_actuators);
   RUN(test_svc_every_runtime_fault);
   RUN(test_svc_closed_loop_refused_gives_arming_timeout);
