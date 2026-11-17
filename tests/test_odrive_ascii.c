@@ -252,6 +252,26 @@ TEST(test_single_line_parser)
   CHECK(!odr_parse_single_line("", &v));
 }
 
+/* Real replies of "r axis0.error" on the bench (2026-11-17): a decimal integer plus ONE trailing 'd'. */
+TEST(test_single_line_parser_axis_error_suffix)
+{
+  float v = -1.0f;
+  CHECK(odr_parse_single_line("0d", &v));        CHECK_NEAR(v, 0, 0);
+  CHECK(odr_parse_single_line("2048d", &v));     CHECK_NEAR(v, 2048, 0);
+  CHECK(odr_parse_single_line(" 2048d ", &v));   CHECK_NEAR(v, 2048, 0);
+  CHECK(odr_parse_single_line("524288d", &v));   CHECK_NEAR(v, 524288, 0);
+  /* everything else after a number is still rejected */
+  CHECK(!odr_parse_single_line("d", &v));
+  CHECK(!odr_parse_single_line("2048dd", &v));
+  CHECK(!odr_parse_single_line("2048d1", &v));
+  CHECK(!odr_parse_single_line("2048 d", &v));
+  CHECK(!odr_parse_single_line("1.5d", &v));
+  CHECK(!odr_parse_single_line("-5d", &v));
+  CHECK(!odr_parse_single_line("1e3d", &v));
+  CHECK(!odr_parse_single_line("2048x", &v));
+  CHECK(!odr_parse_single_line("nand", &v));
+}
+
 TEST(test_queue_read_builds_readonly_request)
 {
   odr_t r;
@@ -360,6 +380,7 @@ void run_odrive_ascii_tests(void)
   RUN(test_timeout_and_stale);
   RUN(test_error_reply_clears_outstanding);
   RUN(test_single_line_parser);
+  RUN(test_single_line_parser_axis_error_suffix);
   RUN(test_queue_read_builds_readonly_request);
   RUN(test_read_roundtrip_and_feedback_resumes);
   RUN(test_read_error_reply_and_timeout_fail);

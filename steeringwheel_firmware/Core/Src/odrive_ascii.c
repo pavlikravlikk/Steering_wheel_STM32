@@ -270,9 +270,30 @@ bool odr_parse_single_line(const char *line, float *out)
     *out = 0.0f;
     return true;
   }
-  if (!odr_parse_float(p, &p, &v) || (*skip_blanks(p) != '\0'))
   {
-    return false;
+    const char *start = p;
+    if (!odr_parse_float(p, &p, &v))
+    {
+      return false;
+    }
+    /* Bench 2026-11-17 (ODrive 0.5.x dev build, "r axis0.error"): this build prints the axis error as a decimal
+     * integer followed by ONE letter 'd' ("0d", "2048d" = 0x800). Accepted only for a plain unsigned integer
+     * (digits only) with the 'd' directly after it; every other trailing character is still rejected. */
+    if (*p == 'd')
+    {
+      for (const char *q = start; q < p; q++)
+      {
+        if ((*q < '0') || (*q > '9'))
+        {
+          return false;
+        }
+      }
+      p++;
+    }
+    if (*skip_blanks(p) != '\0')
+    {
+      return false;
+    }
   }
   *out = v;
   return true;

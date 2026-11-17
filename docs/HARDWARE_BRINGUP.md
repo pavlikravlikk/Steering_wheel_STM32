@@ -204,6 +204,14 @@ loop (torque 0, requested from odrivetool) the PA9 wire was pulled and the axis 
 measured). `odrive_calibrate.py`'s preflight message mentions `odrv0.clear_errors()`; on this build it is
 `odrv0.axis0.clear_errors()` (the device-level method does not exist).
 
+**Bench result 2026-11-17 (F1, ASCII reads):** the first FFB build with ARM_ALLOWED=1 showed `prearm=READ_ERROR` for every
+read. Cause, found by sending the same `r <path>` reads to the ODrive CDC port (/dev/ttyACM0, read-only probe): this build
+prints `axis0.error` as a decimal integer plus one letter `d` (`0d`, `2048d` = 0x800), while all other integers are plain
+(`axis0.motor.error` = `0`) and floats are `4.000000`. The strict parser rejected the `d`. `odr_parse_single_line()` now accepts
+exactly one `d` directly after a plain unsigned integer (tests `test_single_line_parser_axis_error_suffix`). Also seen on the
+CDC port: late `f 0` replies ("-4.528744 0.000000") arriving as answers to other reads (handled as late position replies),
+and one lost reply in 39 (302 ms, two ASCII clients at once).
+
 ## What is verified only on the host (not on hardware)
 - All tools above: unit tests against the REAL dump `docs/odrive_dump.txt` (plus truncated and
   corrupted copies) and a fake ODrive object built from it.
