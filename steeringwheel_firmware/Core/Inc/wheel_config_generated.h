@@ -57,13 +57,13 @@
 
 /* --- FFB limits (used only with -DWHEEL_FFB=ON) ----------------------- */
 #ifndef FFB_PROFILE_MAX_AMPS
-#define FFB_PROFILE_MAX_AMPS          0.8f
+#define FFB_PROFILE_MAX_AMPS          1.0f
 #endif
 #ifndef FFB_SLEW_AMPS_PER_S
-#define FFB_SLEW_AMPS_PER_S           50.0f
+#define FFB_SLEW_AMPS_PER_S           100.0f
 #endif
 #ifndef FFB_HOST_GAIN
-#define FFB_HOST_GAIN                 3.0f   /* game force x gain, then clamped (max_amps is still the cap) */
+#define FFB_HOST_GAIN                 5.0f   /* game force x gain, then clamped (max_amps is still the cap) */
 #endif
 #ifndef FFB_SPRING_KP
 #define FFB_SPRING_KP                 1.5f   /* A per wheel turn */
