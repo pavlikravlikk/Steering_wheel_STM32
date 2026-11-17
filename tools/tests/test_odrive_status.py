@@ -169,6 +169,9 @@ class TestNamesExistInRealDump(unittest.TestCase):
 class TestAnalyseRealDump(unittest.TestCase):
     def setUp(self):
         self.p = gen_config.load_profile(gen_config.DEFAULT_PROFILE)
+        # Pinned: these tests exercise the "profile still has a safety TBD" gate, which must not depend on how far
+        # the real bench work has progressed (the real profile has no safety TBD left since 2026-11-17).
+        self.p["encoder"]["has_index"]["status"] = "TBD"
 
     def test_real_state_differences_and_blocks(self):
         r = odrive_status.analyse(real_values(), self.p)

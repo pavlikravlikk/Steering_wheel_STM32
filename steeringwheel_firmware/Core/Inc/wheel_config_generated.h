@@ -5,8 +5,8 @@
 #define WHEEL_CONFIG_GENERATED_H
 
 #define PROFILE_VERSION               1
-#define PROFILE_TBD_COUNT             19U   /* entries still marked TBD          */
-#define PROFILE_SAFETY_TBD_COUNT      16U   /* ...in belt/encoder/motor/odrive/wheel/uart */
+#define PROFILE_TBD_COUNT             3U   /* entries still marked TBD          */
+#define PROFILE_SAFETY_TBD_COUNT      0U   /* ...in belt/encoder/motor/odrive/wheel/uart */
 /* List of TBD entries: make status (tools/project_status.py). */
 
 /* --- encoder / belt / steering ------------------------------------- */

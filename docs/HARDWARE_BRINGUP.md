@@ -145,7 +145,18 @@ With `--save` the script also sets `motor.config.pre_calibrated = True` and save
 Note: the LPD3806 has no index pulse. With 0.5.x the **encoder** offset calibration is then
 very probably needed after every ODrive power-up (TODO(TBD): confirm). The FFB precheck
 refuses to arm while `encoder.is_ready` is false, so a missing calibration cannot be missed.
-Failure: `CPR_POLEPAIRS_MISMATCH` -> wrong `cpr` (go back to H5) or wrong `pole_pairs`;
+**Bench result 2026-11-17: the calibration needs `calibration_current` 5 A with `current_lim` 6 A.** At 3 A and at 4 A it fails
+with `CPR_POLEPAIRS_MISMATCH` (the 4 kg rotor does not follow the field closely enough; the cpr was already measured as
+2398.7 counts per turn and is not the cause); at 5 A / 6 A it passes (repeated twice, rotor turns about 180 deg and
+back). `odrive_calibrate.py` therefore refuses (it requires current_lim <= profile 4 A). Per-session procedure until the
+script is changed: power up the ODrive (it comes up with the SAVED values 6 A / 5 A, nothing was ever saved with
+`--save`), the STM32 running and feeding the watchdog, then in `odrivetool`: `odrv0.axis0.clear_errors()`,
+`odrv0.axis0.motor.config.current_lim = 6.0`, `odrv0.axis0.motor.config.calibration_current = 5.0`,
+`odrv0.axis0.requested_state = 7`, wait ~10 s, check `current_state 1`, `axis0.error 0`, `encoder.error 0`,
+`encoder.is_ready True`; close odrivetool (it holds the USB interface) and apply the profile again with
+`odrive_setup.py --apply` (back to 4 A). Do NOT `--save` the watchdog setting before the STM32 feeds it (see F3).
+
+Failure: `CPR_POLEPAIRS_MISMATCH` -> wrong `cpr` (go back to H5), wrong `pole_pairs`, or too little calibration current (see above);
 `PHASE_RESISTANCE_OUT_OF_RANGE` -> phase wire loose, or `calibration_current` too low/high.
 
 ## H8. Steering direction and lock-to-lock (default firmware)
@@ -182,6 +193,16 @@ and wait 5 s, then read `odrv0.axis0.error` in odrivetool.
   will then refuse (`AXIS_ERROR`) because the firmware never clears errors. Options, decided
   by the owner: build with `-DFFB_FEED_WATCHDOG_WHEN_DISARMED=1` (the STM32 feeds `u 0` from
   boot; `u` does not move anything), or clear errors in odrivetool right before arming.
+
+**Bench result 2026-11-17 (F3/F4):** this build checks the watchdog **while IDLE too**: right after `enable_watchdog = True`
+the axis shows `WATCHDOG_TIMER_EXPIRED (0x800)`. Chosen option: the STM32 feeds `u 0` from boot. In `cmake` the flag is
+`-DWHEEL_EXTRA_DEFINES=FFB_FEED_WATCHDOG_WHEN_DISARMED=1` (there is no cmake option of that name). Rules learned: enable the
+ODrive watchdog only while the STM32 is already feeding, and run `odrv0.axis0.clear_errors()` once afterwards (the first
+expiry stays latched); the error then stays 0. A one-shot `odrv0.axis0.watchdog_feed()` from odrivetool did NOT keep the error
+away on this build (even with a 5 s timeout), only the continuous `u 0` over the UART does. F4 passed: with the axis in closed
+loop (torque 0, requested from odrivetool) the PA9 wire was pulled and the axis dropped to IDLE with 0x800 (exact timing not
+measured). `odrive_calibrate.py`'s preflight message mentions `odrv0.clear_errors()`; on this build it is
+`odrv0.axis0.clear_errors()` (the device-level method does not exist).
 
 ## What is verified only on the host (not on hardware)
 - All tools above: unit tests against the REAL dump `docs/odrive_dump.txt` (plus truncated and
