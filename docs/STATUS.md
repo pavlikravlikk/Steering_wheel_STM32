@@ -1,3 +1,20 @@
+# Update 2026-11-17: force feedback runs on the bench (wheel dismounted, Linux)
+Done on the real hardware, in order (details and the numbers are in `docs/HARDWARE_BRINGUP.md`, the bench notes):
+- **F1** FFB build (ARM_ALLOWED=1, B1_ONLY=1, `FFB_FEED_WATCHDOG_WHEN_DISARMED=1`): the Linux kernel accepts the PID descriptor
+  (hid-pidff, `wDescriptorLength` 853), `evtest` lists all FF effects, `fftest` uploads six effects.
+- **H4/H5/H6/H7**: 2398.7 counts per turn (cpr 2400, 1:1); the gentle profile is applied to RAM (never `--save`d); the encoder offset
+  calibration needs 5 A / 6 A (3 A and 4 A fail with CPR_POLEPAIRS_MISMATCH) and is done by hand at every ODrive power-up.
+- **F3/F4/F6**: the watchdog runs in IDLE too, the STM32 feeds it; pulling PA9 or PA10 while armed ends in IDLE (ODrive watchdog) and a
+  latched FAULT (POSITION_STALE); B1 disarms. **Not tested on hardware:** OVERSPEED (hand-spinning a 4 kg rotor was judged unsafe).
+- **F5**: first arm worked after two firmware fixes found on the bench (`axis0.error` prints as `2048d`; reads starved the position request
+  in PRECHECK/ARMING) and one profile fix (the ODrive velocity limiter clipped the torque to `vel_limit * vel_gain`, now `vel_gain` 0.25).
+  The spring pulls the housing back to the centre by itself (sign confirmed by motion, not by feel). Limits now: `ffb.max_amps` 0.5 A, spring 1.5 A/turn.
+- **F7** (`fftest`): spring, damper and constant all produce torque, capped at 0.5 A. The `fftest` levels (25 %) are too small to feel.
+- **Open:** direction of game constant forces (`FFB_INVERT_HOST_FORCE`, convention PID/DirectInput 90 deg = +X) is verified only against the spec
+  until a game runs; the game test itself (BeamNG is available on another machine, Windows behaves differently from Linux hid-pidff);
+  F8 (mounting the wheel) needs the hardware e-stop (owner reports the safety items done) and a mechanical rotation stop (not confirmed);
+  `odrive_calibrate.py` still refuses 5 A / 6 A; pedals (Y/Z = 0) and the MCP23017 buttons; `--save` of the profile deliberately not done.
+
 # Update 2026-11-16 (evening): the wheel plays in a game
 - Real hardware chain works: ODrive (24 V) -> UART PA9/PA10 -> STM32 (default build, WHEEL_FFB=OFF) -> USB USER -> PC. Tested on
   a second (Windows) laptop in a game: steering works. `pins.uart_tx/uart_rx` marked `measured`.
