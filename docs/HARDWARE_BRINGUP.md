@@ -223,6 +223,15 @@ speed limit; revisit for the mounted wheel). (2) In PRECHECK/ARMING a queued rea
 ended in POSITION_STALE; fixed (`FFB_PRECHECK_READ_EVERY`). (3) The B1 gesture: LD4 starts to blink about 0.6 s into the third press
 but the arm fires only after 3 s of that press; releasing earlier cancels silently.
 
+**Bench result 2026-11-17 (strength and feel, tools/ff_play.py):** at 100 percent of a 0.5 A cap the effects were barely perceptible.
+Cause 1: the 0.5 A / 0.25 Nm scale is small against the hub motor's friction and cogging (raised to `ffb.max_amps` 0.8 A, spring 1.5 A/turn,
+also set `FFB_SPRING_ONLY_WITHOUT_HOST=0` through `WHEEL_EXTRA_DEFINES` so the centring spring stays on while a game plays effects).
+Cause 2 (the main one): `ffb.slew_amps_per_s` 5 limited the rate of change of ALL forces; a 12.5 Hz 0.8 A sine came out as about
++-0.1 A (= slew * period / 4) and a 150 ms pulse only ramped up. With 50 A/s the log shows a 0.8 A pulse in one sample, a +-0.8 A sine at
+12.5 Hz ("like cobblestones", felt well) and a +-0.25 A sine at 40 Hz ("buzzing"). The emergency stop does not use the limiter. Next
+optional steps: 100 A/s, then `max_amps` 1.0 A (the code ceiling); more than 1 A needs a reviewed safety case. Expect no fine gravel
+texture from this hardware (200 Hz command rate, friction); impacts, bumps and self-aligning force are realistic.
+
 ## What is verified only on the host (not on hardware)
 - All tools above: unit tests against the REAL dump `docs/odrive_dump.txt` (plus truncated and
   corrupted copies) and a fake ODrive object built from it.
