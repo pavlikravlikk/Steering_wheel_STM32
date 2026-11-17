@@ -212,6 +212,17 @@ exactly one `d` directly after a plain unsigned integer (tests `test_single_line
 CDC port: late `f 0` replies ("-4.528744 0.000000") arriving as answers to other reads (handled as late position replies),
 and one lost reply in 39 (302 ms, two ASCII clients at once).
 
+**Bench result 2026-11-17 (F5, the first arm):** (1) the ODrive velocity limiter clips the torque. With
+`enable_current_mode_vel_limit = True` the torque limit is `(vel_limit - speed) * vel_gain`; the saved `vel_gain` 0.02 and the profile's
+`vel_limit` 2 gave 0.04 Nm at rest, so the motor delivered ~0.04 Nm although 0.2373 Nm reached `input_torque` (read over the CDC
+port: `torque_setpoint 0.2373`, `Iq_setpoint 0.0822 A` = 0.041125 Nm / 0.5, exactly (2 + 0.05625) * 0.02). The spring was not
+felt, even at 0.5 A. `vel_gain` is now a profile entry (0.25, written by `odrive_setup.py`) and `gen_config` refuses a profile
+where `vel_limit * vel_gain < ffb.max_amps * torque_constant`. With 0.25 the spring pulled and the housing returned to the
+centre by itself: the sign of the force is right. The limiter also tapers the torque to 0 as the speed reaches `vel_limit` (a soft
+speed limit; revisit for the mounted wheel). (2) In PRECHECK/ARMING a queued read replaced the `f` position request, so arming
+ended in POSITION_STALE; fixed (`FFB_PRECHECK_READ_EVERY`). (3) The B1 gesture: LD4 starts to blink about 0.6 s into the third press
+but the arm fires only after 3 s of that press; releasing earlier cancels silently.
+
 ## What is verified only on the host (not on hardware)
 - All tools above: unit tests against the REAL dump `docs/odrive_dump.txt` (plus truncated and
   corrupted copies) and a fake ODrive object built from it.

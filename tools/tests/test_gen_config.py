@@ -127,6 +127,18 @@ class TestProfile(unittest.TestCase):
         self.assertTrue(any("teeth_pulley" in e for e in errors))
         self.assertTrue(any("wheel.invert" in e for e in errors))
 
+    def test_velocity_limiter_must_not_clip_the_ffb_torque(self):
+        # bench 2026-11-17: vel_limit 2 * vel_gain 0.02 = 0.04 Nm at rest while 0.25 Nm was commanded
+        p = load()
+        errors, _ = gen_config.validate(p)
+        self.assertFalse(any("velocity limiter" in e for e in errors), errors)
+        set_val(p, "odrive", "vel_gain", 0.02)
+        errors, _ = gen_config.validate(p)
+        self.assertTrue(any("velocity limiter" in e for e in errors), errors)
+        set_val(p, "odrive", "enable_current_mode_vel_limit", False)   # no limiter, nothing to clip
+        errors, _ = gen_config.validate(p)
+        self.assertFalse(any("velocity limiter" in e for e in errors), errors)
+
     def test_watchdog_window_consistency(self):
         p = load()
         set_val(p, "odrive", "watchdog_timeout", 0.9)
@@ -202,7 +214,8 @@ class TestSetupScript(unittest.TestCase):
         self.assertIn("odrv0.config.dc_max_negative_current = -1.5", out)
         self.assertIn("odrv0.axis0.motor.config.torque_constant = 0.5", out)
         self.assertNotIn("odrv0.axis0.motor.config.pole_pairs", out)
-        self.assertIn("14 change(s)", out)
+        self.assertIn("15 change(s)", out)          # 14 + vel_gain (0.02 -> 0.25, bench 2026-11-17)
+        self.assertIn("odrv0.axis0.controller.config.vel_gain = 0.25", out)
 
     def test_dry_run_without_dump_lists_everything(self):
         buf = io.StringIO()
@@ -263,7 +276,7 @@ class TestSetupScript(unittest.TestCase):
         # the real dump has errors set but the axis is IDLE and vbus is in range:
         # the setup itself is allowed (it changes no motion state)
         self.assertEqual(rc, 0)
-        self.assertEqual(len(odrv.writes), 14)
+        self.assertEqual(len(odrv.writes), 15)
         self.assertEqual(odrv.calls, [])
         written = dict(odrv.writes)
         self.assertEqual(written["axis0.config.startup_closed_loop_control"], False)

@@ -50,6 +50,7 @@ RANGES = [
     ("odrive", "current_lim", float, 0.5, 20.0),
     ("odrive", "calibration_current", float, 0.5, 20.0),
     ("odrive", "vel_limit", float, 0.1, 20.0),
+    ("odrive", "vel_gain", float, 0.001, 5.0),
     ("odrive", "dc_bus_overvoltage_trip_level", float, 12.0, 56.0),
     ("odrive", "dc_bus_undervoltage_trip_level", float, 8.0, 50.0),
     ("odrive", "dc_max_positive_current", float, 0.5, 30.0),
@@ -247,6 +248,13 @@ def validate(p, require_measured=False):
         warnings.append("odrive.current_lim > 10 A is not a gentle profile")
     if o("vel_limit") > 5.0:
         warnings.append("odrive.vel_limit > 5 turns/s is not a gentle profile")
+    # Bench 2026-11-17: with enable_current_mode_vel_limit the ODrive clips the torque to (vel_limit - speed) * vel_gain,
+    # i.e. vel_limit * vel_gain at rest. With vel_limit 2 and the old vel_gain 0.02 that was 0.04 Nm, so the motor
+    # delivered about 0.04 Nm although 0.25 Nm was commanded (Iq_setpoint 0.0822 A = 0.041125 Nm / 0.5).
+    if o("enable_current_mode_vel_limit") and (o("vel_limit") * o("vel_gain") < f("max_amps") * o("torque_constant") - 1e-9):
+        errors.append("odrive.vel_limit * odrive.vel_gain = %.3f Nm is below ffb.max_amps * torque_constant = %.3f Nm: the ODrive "
+                      "velocity limiter would clip the force even at rest (raise odrive.vel_gain)"
+                      % (o("vel_limit") * o("vel_gain"), f("max_amps") * o("torque_constant")))
     if f("overspeed_turns_s") * val(p, "motor", "motor_turns_per_wheel_rev") > 1.5 * o("vel_limit") + 1e-9:
         warnings.append("ffb.overspeed_turns_s is far above odrive.vel_limit (FFB fault would come late)")
     if d["ffb_uart_tx_load"] > 0.9:
@@ -364,6 +372,7 @@ def setup_settings(p):
         (ax + ".encoder.config.cpr", int(d["cpr"])),
         (ax + ".encoder.config.use_index", bool(val(p, "encoder", "has_index"))),
         (ax + ".controller.config.vel_limit", float(o("vel_limit"))),
+        (ax + ".controller.config.vel_gain", float(o("vel_gain"))),
         (ax + ".controller.config.enable_current_mode_vel_limit", bool(o("enable_current_mode_vel_limit"))),
         (ax + ".controller.config.enable_overspeed_error", bool(o("enable_overspeed_error"))),
         (ax + ".controller.config.control_mode", odrive_enums.CONTROL_MODE_TORQUE_CONTROL),
