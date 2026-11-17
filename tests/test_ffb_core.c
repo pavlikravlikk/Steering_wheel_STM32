@@ -626,7 +626,7 @@ TEST(test_torque_defaults_are_gentle)
   ffb_torque_cfg_t c = tcfg_plain();
   CHECK(c.max_amps <= FFB_HARD_CAP_AMPS);
   CHECK(c.max_amps <= 1.0f);
-  CHECK(c.spring_kp <= 2.0f);   /* 1.0 until 2026-11-17; raised on purpose with the F5 step-2 profile (1.5 A/turn, max 0.5 A) */
+  CHECK(c.spring_kp <= 4.0f);   /* 1.0 until 2026-11-17; raised on purpose (owner): 1.5 for F5 step 2, 3.0 for more resistance */
   CHECK_NEAR(c.half_range_turns, WHEEL_LOCK_TO_LOCK_DEG / 720.0, 1e-6);  /* half of the lock-to-lock (tests pin 540 deg: 0.75 turn) */
 }
 

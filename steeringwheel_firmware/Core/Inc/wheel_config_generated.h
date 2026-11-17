@@ -66,10 +66,10 @@
 #define FFB_HOST_GAIN                 5.0f   /* game force x gain, then clamped (max_amps is still the cap) */
 #endif
 #ifndef FFB_SPRING_KP
-#define FFB_SPRING_KP                 1.5f   /* A per wheel turn */
+#define FFB_SPRING_KP                 3.0f   /* A per wheel turn */
 #endif
 #ifndef FFB_DAMPER_KD
-#define FFB_DAMPER_KD                 0.05f   /* A per wheel turn/s */
+#define FFB_DAMPER_KD                 0.25f   /* A per wheel turn/s */
 #endif
 #ifndef FFB_FRICTION_AMPS
 #define FFB_FRICTION_AMPS             0.03f
