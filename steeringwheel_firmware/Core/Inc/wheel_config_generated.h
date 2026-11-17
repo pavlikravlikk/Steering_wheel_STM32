@@ -57,13 +57,13 @@
 
 /* --- FFB limits (used only with -DWHEEL_FFB=ON) ----------------------- */
 #ifndef FFB_PROFILE_MAX_AMPS
-#define FFB_PROFILE_MAX_AMPS          1.0f
+#define FFB_PROFILE_MAX_AMPS          0.3f
 #endif
 #ifndef FFB_SLEW_AMPS_PER_S
 #define FFB_SLEW_AMPS_PER_S           5.0f
 #endif
 #ifndef FFB_SPRING_KP
-#define FFB_SPRING_KP                 0.5f   /* A per wheel turn */
+#define FFB_SPRING_KP                 0.2f   /* A per wheel turn */
 #endif
 #ifndef FFB_DAMPER_KD
 #define FFB_DAMPER_KD                 0.05f   /* A per wheel turn/s */
