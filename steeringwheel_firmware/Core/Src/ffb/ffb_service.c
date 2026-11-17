@@ -207,11 +207,11 @@ static void schedule_read(ffb_service_t *s)
   switch (s->sm.state)
   {
     case FFB_STATE_PRECHECK:
-      due = true;
+      due = (s->cycle_count % FFB_PRECHECK_READ_EVERY) == 0U;   /* the other cycles refresh the position */
       item = ffb_pc_next(&s->pc);
       break;
     case FFB_STATE_ARMING:
-      due = true;
+      due = (s->cycle_count % FFB_PRECHECK_READ_EVERY) == 0U;
       item = ffb_pc_next_monitor(&s->pc);
       break;
     case FFB_STATE_RUNNING:

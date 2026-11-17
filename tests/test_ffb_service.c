@@ -28,7 +28,10 @@ typedef struct
   /* wheel */
   bool  have_wheel;
   float angle, vel;
-  uint32_t age;
+  uint32_t age;                 /* base age (injected faults raise it)      */
+  bool  model_age;              /* age also grows since the last REAL "f" request (a read replaces that request) */
+  bool  f_seen;
+  uint32_t last_f_ms;
   float host;
   bool  host_on;
   /* logs */
@@ -47,6 +50,7 @@ static void mock_ready(void)
   M.vel_limit = 2; M.torque_constant = 0.04f; M.motor_calibrated = 1; M.encoder_ready = 1;
   M.vbus = 24.0f; M.current_state = 1;
   M.have_wheel = true; M.age = 2;
+  M.model_age = true;           /* bench 2026-11-17: a queued read displaces the position request */
 }
 
 static bool prop(const char *path, float *v)
@@ -96,6 +100,7 @@ static void io_link_request(uint32_t now)
   (void)now;
   M.nrequests++;
   if (M.have_queued && !M.read_sent) { M.read_sent = true; M.nreads++; return; }
+  M.f_seen = true; M.last_f_ms = now;      /* a real position request went out */
   if (M.drop_replies) M.timeouts++; else M.replies++;
 }
 
@@ -116,8 +121,8 @@ static bool io_send_write(const char *cmd, bool urgent)
 
 static bool io_wheel(uint32_t now, float *a, float *v, uint32_t *age)
 {
-  (void)now;
   *a = M.angle; *v = M.vel; *age = M.age;
+  if (M.model_age && M.f_seen) *age = M.age + (now - M.last_f_ms);
   return M.have_wheel;
 }
 static uint32_t io_timeouts(void) { return M.timeouts; }

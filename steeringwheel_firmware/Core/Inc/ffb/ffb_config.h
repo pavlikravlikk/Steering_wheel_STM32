@@ -85,6 +85,10 @@
 #define FFB_MONITOR_EVERY               3U     /* RUNNING: 1 read per N cycles   */
 #define FFB_MONITOR_MAX_AGE_MS          400U   /* monitored value older -> fault */
 #define FFB_DISARMED_READ_EVERY         20U    /* DISARMED: 1 read per N cycles  */
+/* PRECHECK / ARMING: 1 read per N cycles. Must be >= 2: a queued read REPLACES the "f" position request of that
+ * cycle (one request at a time), so reading every cycle starves the position, which then goes stale
+ * (FFB_STALE_MS) and the arm ends in POSITION_STALE (found on the bench 2026-11-17). */
+#define FFB_PRECHECK_READ_EVERY         2U
 #define FFB_PRECHECK_MAX_AGE_MS         1500U  /* precheck values younger than   */
 #define FFB_CENTRE_LOCKOUT_MS           2000U  /* no set-centre right after disarm*/
 
@@ -116,5 +120,6 @@
 _Static_assert(FFB_HARD_CAP_AMPS <= 1.0f, "FFB hard cap above 1 A needs a reviewed safety case");
 _Static_assert(FFB_COMMAND_PERIOD_MS >= 1U, "command period");
 _Static_assert(FFB_STALE_MS >= 3U * FFB_COMMAND_PERIOD_MS, "stale window too short");
+_Static_assert(FFB_PRECHECK_READ_EVERY >= 2U, "reads every cycle starve the position request");
 
 #endif /* FFB_CONFIG_H */
