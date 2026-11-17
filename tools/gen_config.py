@@ -49,6 +49,8 @@ RANGES = [
     ("odrive", "axis", int, 0, 1),
     ("odrive", "current_lim", float, 0.5, 20.0),
     ("odrive", "calibration_current", float, 0.5, 20.0),
+    ("odrive", "encoder_cal_current", float, 0.5, 20.0),
+    ("odrive", "encoder_cal_current_lim", float, 0.5, 20.0),
     ("odrive", "vel_limit", float, 0.1, 20.0),
     ("odrive", "vel_gain", float, 0.001, 5.0),
     ("odrive", "dc_bus_overvoltage_trip_level", float, 12.0, 56.0),
@@ -227,6 +229,10 @@ def validate(p, require_measured=False):
     f = lambda k: val(p, "ffb", k)     # noqa: E731
     if o("calibration_current") > o("current_lim"):
         errors.append("odrive.calibration_current must be <= odrive.current_lim")
+    if o("encoder_cal_current") > o("encoder_cal_current_lim"):
+        errors.append("odrive.encoder_cal_current must be <= odrive.encoder_cal_current_lim")
+    if o("encoder_cal_current_lim") > 10.0:
+        warnings.append("odrive.encoder_cal_current_lim > 10 A is a lot for a calibration")
     if o("dc_bus_undervoltage_trip_level") >= o("dc_bus_overvoltage_trip_level"):
         errors.append("odrive undervoltage trip must be below the overvoltage trip")
     if not (o("dc_bus_undervoltage_trip_level") < f("vbus_min_v") < f("vbus_max_v")

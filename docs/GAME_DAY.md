@@ -9,6 +9,12 @@ Safety rules for the whole session: the housing is held by the hand and the stee
 1 s or longer: that re-centres); mains terminals covered; fingers away from the gears.
 
 ## 1. Linux laptop: bring the rig to "ready" (every power-up)
+**Shortcut (2026-11-17): one command does steps 2-5 below** (close odrivetool first, the STM32 must be running):
+`~/odrive-env/bin/python tools/session_start.py`. It reads the errors WITH NAMES, clears only the normal watchdog leftover (0x800) and
+stops on anything else (read it, then `--force-clear`), calibrates at 5 A / 6 A after you type `I AM CLEAR` (the motor moves), applies
+the profile (RAM only), clears the leftover that enabling the watchdog causes, and prints the pre-arm verdict (`READY`). Tests use a fake
+ODrive; it has NOT been run on the real ODrive yet. Do the same after an STM32 restart (the cable move in section 2).
+
 1. 24 V on. STM32: ST-LINK and USER cables in the Linux laptop. ODrive USB in the Linux laptop.
 2. `odrv0.axis0.clear_errors()` in odrivetool, then `odrv0.axis0.error` must be 0 and stay 0 (the STM32 feeds the watchdog).
 3. Calibrate by hand (the ODrive comes up with the saved 6 A / 5 A values): `odrv0.axis0.clear_errors()`,
