@@ -37,8 +37,8 @@ teeth_pulley  = { value = 20, status = "measured", note = "counted by the user, 
 
 # -----------------------------------------------------------------------------
 [encoder]
-ppr          = { value = 600, status = "TBD", how_to_measure = "LPD3806-600BM: 600 pulses per revolution per channel (label). Confirm with tools/measure_counts.py: one encoder-shaft turn by hand must give 4*PPR counts." }
-quadrature   = { value = 4, status = "TBD", how_to_measure = "ODrive counts every edge of A and B (x4). Keep 4 unless the measurement says otherwise." }
+ppr          = { value = 600, status = "measured", note = "bench 2026-11-17: 10 housing turns = 23987 counts (2398.7 per turn, 0.05 percent from 2400); this confirms ppr x quadrature x gear ratio as a product", how_to_measure = "LPD3806-600BM: 600 pulses per revolution per channel (label). Confirm with tools/measure_counts.py: one encoder-shaft turn by hand must give 4*PPR counts." }
+quadrature   = { value = 4, status = "measured", note = "bench 2026-11-17: see encoder.ppr (product confirmed: 2398.7 counts per housing turn)", how_to_measure = "ODrive counts every edge of A and B (x4). Keep 4 unless the measurement says otherwise." }
 has_index    = { value = false, status = "TBD", how_to_measure = "LPD3806 has no Z/index channel. Keep false." }
 
 # -----------------------------------------------------------------------------
@@ -47,7 +47,7 @@ pole_pairs       = { value = 15, status = "TBD", how_to_measure = "Hoverboard hu
 phase_resistance = { value = 0.166, status = "measured", how_to_measure = "Read axis0.motor.config.phase_resistance after a MOTOR_CALIBRATION (ohm). Documentation only." }
 # Direct drive: the steering wheel is bolted to the motor housing. 1 housing turn = 1 wheel turn = 1 encoder turn
 # (20:20 gear pair). Still TBD: confirm on the bench (H5/H8), the user only reported the gear teeth.
-motor_turns_per_wheel_rev = { value = 1.0, status = "TBD", how_to_measure = "Turn the steering wheel exactly one full turn and watch the motor housing: number of housing turns. 1.0 for direct drive." }
+motor_turns_per_wheel_rev = { value = 1.0, status = "measured", note = "bench 2026-11-17: 10 clockwise housing turns by hand gave shadow_count -21395 -> -45382 (-23987), implied ratio 1:1, odrive_turns_per_wheel_rev 0.9995", how_to_measure = "Turn the steering wheel exactly one full turn and watch the motor housing: number of housing turns. 1.0 for direct drive." }
 
 # -----------------------------------------------------------------------------
 [odrive]

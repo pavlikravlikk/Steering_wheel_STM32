@@ -144,7 +144,9 @@ class TestProfile(unittest.TestCase):
         self.assertFalse(any("UART" in e for e in errors), errors)
 
     def test_require_measured_rejects_tbd(self):
-        errors, _ = gen_config.validate(load(), require_measured=True)
+        p = load()
+        p["encoder"]["ppr"]["status"] = "TBD"   # pinned here: the real profile's status changes as the bench work advances
+        errors, _ = gen_config.validate(p, require_measured=True)
         self.assertTrue(any("encoder.ppr is still TBD" in e for e in errors))
         self.assertFalse(any("belt.teeth" in e for e in errors))   # gear pair 20:20 counted 2026-11-16
         p = load()
