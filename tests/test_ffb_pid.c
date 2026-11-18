@@ -449,6 +449,29 @@ TEST(test_fx_constant_cap_limits_the_impact_only)
   CHECK_NEAR(E.gains.constant_cap, 1.0, 1e-6);
 }
 
+/* Dead band of the game's constant force: restless small corrections are dropped, big forces keep their full scale. */
+TEST(test_fx_constant_deadband)
+{
+  fresh();
+  ffb_fx_set_constant_filter(&E, 0.0f);
+  ffb_fx_set_constant_deadband(&E, 0.1f);
+  create(FFB_ET_CONSTANT);
+  set_effect(1, FFB_ET_CONSTANT, FFB_TIME_INFINITE, 0, 255, 9000);
+  op(1, FFB_OP_START, 1, 0);
+  set_constant(1, 500);                                        /* 5 percent: inside the band */
+  CHECK_NEAR(force(10, 0, 0), 0.0, 1e-6);
+  set_constant(1, 1000);                                       /* exactly at the edge */
+  CHECK_NEAR(force(20, 0, 0), 0.0, 1e-6);
+  set_constant(1, 5500);                                       /* (0.55 - 0.1) / 0.9 = 0.5 */
+  CHECK_NEAR(force(30, 0, 0), 0.5, 2e-3);
+  set_constant(1, 10000);                                      /* full scale stays full scale */
+  CHECK_NEAR(force(40, 0, 0), 1.0, 1e-6);
+  set_constant(1, -5500);
+  CHECK_NEAR(force(50, 0, 0), -0.5, 2e-3);
+  ffb_fx_set_constant_deadband(&E, 5.0f);                      /* not a fraction: off */
+  CHECK_NEAR(E.gains.constant_deadband, 0.0, 1e-6);
+}
+
 TEST(test_fx_damper_friction_inertia)
 {
   fresh();
@@ -626,6 +649,7 @@ void run_ffb_pid_tests(void)
   RUN(test_fx_ramp);
   RUN(test_fx_spring_condition);
   RUN(test_fx_gains_per_kind);
+  RUN(test_fx_constant_deadband);
   RUN(test_fx_constant_cap_limits_the_impact_only);
   RUN(test_fx_constant_filter_smooths_steps);
   RUN(test_fx_direction_invert_leaves_conditions_alone);

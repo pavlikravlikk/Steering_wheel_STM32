@@ -294,6 +294,7 @@ void ffb_pid_init(void)
   ffb_fx_set_direction_invert(&s_engine, FFB_INVERT_GAME_DIRECTION != 0);
   ffb_fx_set_constant_filter(&s_engine, FFB_CONSTANT_FILTER_HZ);
   ffb_fx_set_constant_cap(&s_engine, FFB_CONSTANT_MAX_AMPS / FFB_MAX_AMPS);
+  ffb_fx_set_constant_deadband(&s_engine, FFB_CONSTANT_DEADBAND_AMPS / FFB_MAX_AMPS);
   ffb_pid_queue_init(&s_queue);
   memset(&s_stats, 0, sizeof(s_stats));
   (void)ffb_pid_build_block_load(&s_engine, s_bl_snapshot, sizeof(s_bl_snapshot));

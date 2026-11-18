@@ -62,6 +62,7 @@ typedef struct
   float constant;        /* constant, ramp (cornering, impacts)                  */
   float condition;       /* spring, damper, inertia, friction                    */
   float periodic_cap;    /* the periodic part alone is limited to +-this (normalised, 0..1) */
+  float constant_deadband;  /* the constant / ramp part below +-this is ignored, above it the rest is rescaled (normalised, 0..1) */
   float constant_cap;       /* the constant / ramp part alone is limited to +-this (normalised, 0..1): crashes, skids */
   float constant_filter_hz; /* low-pass on the constant / ramp part (0 = off): the game changes that force in steps */
   float direction_sign;  /* +1, or -1 = the direction of constant / ramp / periodic effects is mirrored (conditions are not) */
@@ -103,6 +104,11 @@ void ffb_fx_set_constant_filter(ffb_fx_engine_t *e, float hz);
 /** Limit of the constant force and ramp alone (a crash, a skid, the self-aligning force), normalised 0..1; 0 or >= 1 = no limit.
  *  A full-scale crash force on a light rotor throws the wheel for almost two turns; this keeps an impact a jolt. */
 void ffb_fx_set_constant_cap(ffb_fx_engine_t *e, float cap);
+
+/** Dead band of the constant force and ramp (normalised 0..1; 0 = off). The game sends small, restless corrections (road, camber,
+ *  tyre noise) all the time: on a straight road they were felt as a constant jerking. A force below the band is dropped; above it
+ *  the rest is rescaled so that a full-scale force is still full scale (no step at the edge of the band). */
+void ffb_fx_set_constant_deadband(ffb_fx_engine_t *e, float db);
 
 /** PID Device Reset: stop and free everything, defaults back. */
 void ffb_fx_reset(ffb_fx_engine_t *e);

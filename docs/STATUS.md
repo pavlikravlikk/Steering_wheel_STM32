@@ -21,7 +21,8 @@ Older, dated notes: `docs/archive/STATUS_HISTORY.md`.
 | `ffb.damper_amps_per_turn_s` / `friction_amps` | 0.3 / 0.04 A | more damping and a little friction against the hunting of the wheel on a straight road (gravel and viscous effects, which add damping, were fine) |
 | `ffb.slew_amps_per_s` | 80 | the current changes by at most 0.4 A per cycle (100 at first, 40 for a while: impacts were too soft) |
 | `ffb.constant_max_amps` | 2.0 A | the STRENGTH OF AN IMPACT: the game's constant force / ramp (crash, skid, self-aligning) alone is limited to this (it was all of max_amps = 5 A, which threw the wheel almost two turns). Gravel and the spring/wall are not limited by it |
-| `ffb.constant_filter_hz` | 6 | low-pass on the game's constant force / ramp only (the game changes it in steps; each step was a jerk). Gravel and the conditions are not filtered |
+| `ffb.constant_deadband_amps` | 0.4 A | the game's small restless constant-force corrections below this are ignored (jerking on a straight road), above it the rest is rescaled |
+| `ffb.constant_filter_hz` | 4 | low-pass on the game's constant force / ramp only (the game changes it in steps; each step was a jerk). Gravel and the conditions are not filtered |
 | `ffb.vel_filter_hz` | 12 | low-pass on the wheel speed used by damper / friction / wall damping (less jerk from the noisy speed) |
 | `ffb.invert_game_direction` | true | MIRRORS the direction of the game's constant force / ramp / periodic effects (not spring/damper/friction/inertia). Set because the wheel wove on a straight road and pushed the wrong way; open until confirmed with a game: turn right at speed and let go, the wheel must come back to the centre |
 | `ffb.gain_periodic` / `gain_constant` / `gain_condition` | 8 / 1.2 / 1 | gain per kind of GAME effect: texture (gravel, rumble) x5, constant force and impacts x2, spring/damper/friction of the game x1 (closed loop, keep low); `host_gain` 1.0 stays as an overall multiplier |

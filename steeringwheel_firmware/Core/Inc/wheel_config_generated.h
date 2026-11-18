@@ -74,11 +74,14 @@
 #ifndef FFB_STOP_AMPS
 #define FFB_STOP_AMPS                 5.0f   /* soft stop force at stop_full_deg */
 #endif
+#ifndef FFB_CONSTANT_DEADBAND_AMPS
+#define FFB_CONSTANT_DEADBAND_AMPS    0.4f   /* game constant force below this is ignored (A), the rest is rescaled */
+#endif
 #ifndef FFB_CONSTANT_MAX_AMPS
 #define FFB_CONSTANT_MAX_AMPS         2.0f   /* the game constant force / ramp alone is limited to this (A): crashes, skids */
 #endif
 #ifndef FFB_CONSTANT_FILTER_HZ
-#define FFB_CONSTANT_FILTER_HZ        6.0f   /* low-pass on the game constant force / ramp (0 = off) */
+#define FFB_CONSTANT_FILTER_HZ        4.0f   /* low-pass on the game constant force / ramp (0 = off) */
 #endif
 #ifndef FFB_VEL_FILTER_HZ
 #define FFB_VEL_FILTER_HZ             12.0f   /* low-pass on the wheel speed for damper/friction (0 = off) */

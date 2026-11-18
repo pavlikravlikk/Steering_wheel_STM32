@@ -65,6 +65,7 @@ void ffb_fx_init(ffb_fx_engine_t *e)
   ffb_fx_set_gains(e, 1.0f, 1.0f, 1.0f, 1.0f);
   e->gains.direction_sign = 1.0f;
   e->gains.constant_cap = 1.0f;
+  e->gains.constant_deadband = 0.0f;
   ffb_fx_reset(e);
 }
 
@@ -74,6 +75,11 @@ void ffb_fx_set_gains(ffb_fx_engine_t *e, float periodic, float constant, float 
   e->gains.constant = (finite_f(constant) && (constant >= 0.0f)) ? constant : 1.0f;
   e->gains.condition = (finite_f(condition) && (condition >= 0.0f)) ? condition : 1.0f;
   e->gains.periodic_cap = (finite_f(periodic_cap) && (periodic_cap > 0.0f) && (periodic_cap < 1.0f)) ? periodic_cap : 1.0f;
+}
+
+void ffb_fx_set_constant_deadband(ffb_fx_engine_t *e, float db)
+{
+  e->gains.constant_deadband = (finite_f(db) && (db > 0.0f) && (db < 1.0f)) ? db : 0.0f;
 }
 
 void ffb_fx_set_constant_cap(ffb_fx_engine_t *e, float cap)
@@ -463,6 +469,12 @@ float ffb_fx_force(ffb_fx_engine_t *e, uint32_t now_ms, float pos, float vel, bo
     e->constant_filt = e->have_constant_filt ? (e->constant_filt + (alpha * (csum - e->constant_filt))) : csum;
     e->have_constant_filt = true;
     csum = e->constant_filt;
+  }
+  if (e->gains.constant_deadband > 0.0f)
+  {
+    const float db = e->gains.constant_deadband;
+    const float a = absf(csum);
+    csum = (a <= db) ? 0.0f : (((csum > 0.0f) ? 1.0f : -1.0f) * ((a - db) / (1.0f - db)));
   }
   if (e->gains.constant_cap < 1.0f)
   {
