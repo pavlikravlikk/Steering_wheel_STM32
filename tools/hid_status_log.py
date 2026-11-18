@@ -19,6 +19,7 @@ What it writes (only changes, so the file stays small):
   * when the state becomes FAULT: the last ~2 s of samples BEFORE it (current, supply voltage, command rate), so you can see
     whether the supply rose (regeneration), the current was at the cap, or the link failed;
   * a line every 10 s with the peak current and the supply min / max;
+  * the steering angle and speed (from the joystick X reports) in the samples before a FAULT and the peak speed in the summaries;
   * when the wheel disappears (USB unplugged, STM32 reset) and when it comes back.
 It only READS (HID feature report 0x40). It never sends anything to the wheel. The fault code is lost when the STM32 is reset,
 so start this BEFORE the game and do not reset the STM32 before you have copied the log.
@@ -35,6 +36,7 @@ import hid_probe  # noqa: E402  (same folder)
 VID, PID = hid_probe.VID, hid_probe.PID
 HISTORY_SAMPLES = 40          # about 2 s at 50 ms
 SUMMARY_EVERY_S = 10.0
+DEFAULT_HALF_RANGE_DEG = 450.0      # lock-to-lock 900 deg (profile wheel.lock_to_lock_deg / 2)
 
 
 def key_of(r):
@@ -45,10 +47,14 @@ def key_of(r):
 class Monitor:
     """Pure logic (no hardware): feed() takes decoded status dicts and returns the lines to log."""
 
-    def __init__(self, history=HISTORY_SAMPLES):
+    def __init__(self, history=HISTORY_SAMPLES, half_range_deg=DEFAULT_HALF_RANGE_DEG):
+        self.half = half_range_deg
+        self.last_x = None
+        self.last_x_t = None
         self.last_key = None
         self.hist = collections.deque(maxlen=history)
         self.peak_a = 0.0
+        self.peak_speed = 0.0
         self.vmin = None
         self.vmax = None
         self.last_summary = None
@@ -57,17 +63,33 @@ class Monitor:
     def _stamp(self, now):
         return time.strftime("%H:%M:%S", time.localtime(now)) + ".%03d" % int((now % 1) * 1000)
 
-    def _sample_line(self, now, r):
-        return "%s  %+.3f A  vbus %.1f V  rate %d Hz  loop_max %d us  odrive_timeouts %d" % (
-            self._stamp(now), r["torque_cmd_amps"], r["vbus_v"], r["command_rate_hz"], r["loop_time_max_us"],
-            r["odrive_timeouts"])
+    def _angle(self, now, x):
+        """HID X (0..65535, centre 32768) -> (degrees, deg/s); (None, None) when no input report was seen."""
+        if x is None:
+            return None, None
+        deg = (x - 32768) / 32768.0 * self.half
+        speed = None
+        if self.last_x is not None and now > self.last_x_t:
+            speed = (deg - self.last_x) / (now - self.last_x_t)
+        self.last_x, self.last_x_t = deg, now
+        return deg, speed
 
-    def feed(self, now, r):
+    def _sample_line(self, now, r, deg=None, speed=None):
+        pos = "" if deg is None else "  angle %+.0f deg  speed %s" % (
+            deg, "?" if speed is None else "%+.0f deg/s (%.2f turns/s)" % (speed, abs(speed) / 360.0))
+        return "%s  %+.3f A  vbus %.1f V  rate %d Hz  loop_max %d us  odrive_timeouts %d%s" % (
+            self._stamp(now), r["torque_cmd_amps"], r["vbus_v"], r["command_rate_hz"], r["loop_time_max_us"],
+            r["odrive_timeouts"], pos)
+
+    def feed(self, now, r, x=None):
         out = []
+        deg, speed = self._angle(now, x)
         if self.present is not True:
             out.append("%s  wheel connected" % self._stamp(now))
             self.present = True
         self.peak_a = max(self.peak_a, abs(r["torque_cmd_amps"]))
+        if speed is not None:
+            self.peak_speed = max(self.peak_speed, abs(speed))
         if r["vbus_v"] > 0:
             self.vmin = r["vbus_v"] if self.vmin is None else min(self.vmin, r["vbus_v"])
             self.vmax = r["vbus_v"] if self.vmax is None else max(self.vmax, r["vbus_v"])
@@ -81,14 +103,15 @@ class Monitor:
             if became_fault:
                 out.append("%s  *** FAULT = %s *** (fault codes: docs/FFB_SAFETY.md section 6)" % (self._stamp(now), r["fault"]))
             self.last_key = k
-        self.hist.append(self._sample_line(now, r))
+        self.hist.append(self._sample_line(now, r, deg, speed))
         if self.last_summary is None:
             self.last_summary = now
         elif now - self.last_summary >= SUMMARY_EVERY_S:
-            out.append("%s  summary: peak %.3f A, vbus %.1f..%.1f V, state %s" % (
-                self._stamp(now), self.peak_a, self.vmin or 0.0, self.vmax or 0.0, r["state"]))
+            out.append("%s  summary: peak %.3f A, vbus %.1f..%.1f V, peak speed %.2f turns/s, state %s" % (
+                self._stamp(now), self.peak_a, self.vmin or 0.0, self.vmax or 0.0, self.peak_speed / 360.0, r["state"]))
             self.peak_a = 0.0
             self.vmin = self.vmax = None
+            self.peak_speed = 0.0
             self.last_summary = now
         return out
 
@@ -104,16 +127,42 @@ class HidrawDevice:
 
     def __init__(self):
         self.path = None
+        self.fd = None
 
     def open_path(self, path):
         self.path = path
         fd = os.open(path, os.O_RDWR)          # raises OSError (permission: udev rule or sudo)
         os.close(fd)
+        try:
+            self.fd = os.open(path, os.O_RDONLY | os.O_NONBLOCK)   # input reports (steering angle)
+        except OSError:
+            self.fd = None
+
+    def read_latest_x(self):
+        """Newest joystick X (0..65535) among the input reports waiting, or None."""
+        x = None
+        while self.fd is not None:
+            try:
+                data = os.read(self.fd, 64)
+            except (BlockingIOError, InterruptedError):
+                break
+            except OSError:
+                break
+            try:
+                r = hid_probe.decode_report(data)
+            except ValueError:
+                continue
+            if r["type"] == "joystick":
+                x = r["x"]
+        return x
 
     def get_feature_report(self, report_id, length):
         return list(hid_probe.read_feature(self.path, report_id, length))
 
     def close(self):
+        if self.fd is not None:
+            os.close(self.fd)
+            self.fd = None
         self.path = None
 
 
@@ -190,6 +239,30 @@ def open_status_device(hid_module, diag=None):
     return None
 
 
+def read_x(dev):
+    """Newest steering X from the input reports (None if the backend cannot read them or none arrived)."""
+    try:
+        if hasattr(dev, "read_latest_x"):
+            return dev.read_latest_x()
+        if hasattr(dev, "set_nonblocking"):                  # hidapi
+            dev.set_nonblocking(1)
+            x = None
+            for _ in range(16):
+                data = bytes(dev.read(64))
+                if not data:
+                    break
+                try:
+                    r = hid_probe.decode_report(data)
+                except ValueError:
+                    continue
+                if r["type"] == "joystick":
+                    x = r["x"]
+            return x
+    except (OSError, ValueError):
+        pass
+    return None
+
+
 def read_status(dev):
     for n in FEATURE_LENGTHS:
         try:
@@ -213,8 +286,9 @@ def diagnose(hid_module, out=print):
     return 0
 
 
-def run(hid_module, log_path, interval, once=False, out=print, sleep=time.sleep, clock=time.time, max_loops=None):
-    mon = Monitor()
+def run(hid_module, log_path, interval, once=False, out=print, sleep=time.sleep, clock=time.time, max_loops=None,
+        half_range_deg=DEFAULT_HALF_RANGE_DEG):
+    mon = Monitor(half_range_deg=half_range_deg)
     log = open(log_path, "a", encoding="utf-8") if log_path else None
 
     def emit(lines):
@@ -240,7 +314,7 @@ def run(hid_module, log_path, interval, once=False, out=print, sleep=time.sleep,
                     dev = found[0]
             if dev is not None:
                 try:
-                    emit(mon.feed(clock(), read_status(dev)))
+                    emit(mon.feed(clock(), read_status(dev), read_x(dev)))
                 except (OSError, ValueError):
                     try:
                         dev.close()
@@ -266,6 +340,8 @@ def main(argv=None):
     ap.add_argument("--once", action="store_true", help="read the status once and exit")
     ap.add_argument("--diag", action="store_true", help="list the HID interfaces and every read attempt with its error, then exit")
     ap.add_argument("--log", default="wheel_log.txt", help="log file (appended); '' = no file")
+    ap.add_argument("--half-range-deg", type=float, default=DEFAULT_HALF_RANGE_DEG,
+                    help="degrees from the centre to full X (lock-to-lock / 2; 450 for 900 deg)")
     ap.add_argument("--interval", type=float, default=0.05, help="seconds between reads (default 0.05)")
     a = ap.parse_args(argv)
     if sys.platform.startswith("linux"):
@@ -280,7 +356,7 @@ def main(argv=None):
         print("hidapi module: %s" % getattr(hid, "__file__", "?"))
         return diagnose(hid)
     print("Monitoring the wheel (VID %04X PID %04X). Ctrl+C stops. Log: %s" % (VID, PID, a.log or "(none)"))
-    return run(hid, a.log or None, a.interval, once=a.once)
+    return run(hid, a.log or None, a.interval, once=a.once, half_range_deg=a.half_range_deg)
 
 
 if __name__ == "__main__":

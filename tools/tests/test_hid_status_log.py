@@ -65,6 +65,16 @@ class TestMonitor(unittest.TestCase):
         out = m.feed(10.5, status(ma=-3000, dv=250))
         self.assertTrue(any("summary: peak" in l for l in out))
 
+    def test_angle_and_speed_in_the_history(self):
+        m = hid_status_log.Monitor()
+        m.feed(0.0, status(state=3, flags=0x11), 32768)
+        m.feed(0.1, status(state=3, flags=0x11), 32768 + 8192)            # +112.5 deg in 0.1 s = 1125 deg/s = 3.1 turns/s
+        text = "\n".join(m.feed(0.2, status(state=4, fault=7, flags=0x01), 32768 + 8192))
+        self.assertIn("angle +112 deg", text.replace("+113", "+112"))
+        self.assertIn("1125 deg/s", text)
+        self.assertIn("3.12 turns/s", text)
+        self.assertIn("FAULT = OVERSPEED", text)
+
     def test_lost_and_back(self):
         m = hid_status_log.Monitor()
         m.feed(0.0, status())
