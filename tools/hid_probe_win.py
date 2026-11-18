@@ -8,6 +8,7 @@ Setup (once, on the laptop where the wheel is plugged into USB USER):
 Run:
     py hid_probe_win.py              # live monitor, appends to wheel_log.txt, Ctrl+C stops
     py hid_probe_win.py --once       # read the status once and exit
+    py hid_probe_win.py --diag       # 'wheel NOT readable'? shows every interface and every attempt with its error
     py hid_probe_win.py --log C:\\x\\game.txt --interval 0.05
 
 What it writes (only changes, so the file stays small):
@@ -95,28 +96,81 @@ class Monitor:
         return ["%s  wheel NOT readable (unplugged, STM32 reset, or held by another program)" % self._stamp(now)]
 
 
-def open_status_device(hid_module):
-    """Try every HID interface of the wheel until one answers the status feature report. Returns (device, path) or None."""
-    for info in hid_module.enumerate(VID, PID):
-        dev = hid_module.device()
+# Windows' HidD_GetFeature wants the buffer length to match the feature report size of the interface, which depends on the
+# descriptor; the status report is 16 bytes, so 16 first, then larger sizes (extra bytes are ignored by the decoder).
+FEATURE_LENGTHS = (hid_probe.FFB_STATUS_LEN, 17, 18, 20, 24, 32, 33, 48, 64, 65)
+
+
+def try_interface(hid_module, info, diag=None):
+    """Open one HID interface and try to read the status. Returns the device or None; diag gets one line per try."""
+    note = diag.append if diag is not None else (lambda line: None)
+    dev = hid_module.device()
+    try:
+        dev.open_path(info["path"])
+    except (OSError, ValueError) as e:
+        note("  open failed: %s" % e)
+        return None
+    for n in FEATURE_LENGTHS:
         try:
-            dev.open_path(info["path"])
-            data = bytes(dev.get_feature_report(hid_probe.REPORT_ID_FFB_STATUS, hid_probe.FFB_STATUS_LEN))
-            if data and data[0] == hid_probe.REPORT_ID_FFB_STATUS:
-                hid_probe.decode_ffb_status(data)
-                return dev, info["path"]
-            dev.close()
-        except (OSError, ValueError):
-            try:
-                dev.close()
-            except Exception:  # noqa: BLE001
-                pass
+            data = bytes(dev.get_feature_report(hid_probe.REPORT_ID_FFB_STATUS, n))
+        except (OSError, ValueError) as e:
+            note("  get_feature_report(0x40, %d): %s" % (n, e))
+            continue
+        if not data or data[0] != hid_probe.REPORT_ID_FFB_STATUS:
+            note("  get_feature_report(0x40, %d): answered %d bytes, first byte %s (not 0x40)" % (
+                n, len(data), ("0x%02X" % data[0]) if data else "-"))
+            continue
+        try:
+            hid_probe.decode_ffb_status(data)
+        except ValueError as e:
+            note("  get_feature_report(0x40, %d): %s" % (n, e))
+            continue
+        note("  get_feature_report(0x40, %d): OK" % n)
+        return dev
+    try:
+        dev.close()
+    except Exception:  # noqa: BLE001
+        pass
+    return None
+
+
+def open_status_device(hid_module, diag=None):
+    """Try every HID interface of the wheel until one answers the status feature report. Returns (device, path) or None."""
+    infos = list(hid_module.enumerate(VID, PID))
+    if diag is not None:
+        diag.append("%d HID interface(s) with VID %04X PID %04X" % (len(infos), VID, PID))
+    for info in infos:
+        if diag is not None:
+            diag.append("interface: usage_page=0x%04X usage=0x%04X interface=%s product=%r path=%r" % (
+                info.get("usage_page", 0), info.get("usage", 0), info.get("interface_number"), info.get("product_string"),
+                info.get("path")))
+        dev = try_interface(hid_module, info, diag)
+        if dev is not None:
+            return dev, info["path"]
     return None
 
 
 def read_status(dev):
-    data = bytes(dev.get_feature_report(hid_probe.REPORT_ID_FFB_STATUS, hid_probe.FFB_STATUS_LEN))
-    return hid_probe.decode_ffb_status(data)
+    for n in FEATURE_LENGTHS:
+        try:
+            data = bytes(dev.get_feature_report(hid_probe.REPORT_ID_FFB_STATUS, n))
+        except (OSError, ValueError):
+            continue
+        if data and data[0] == hid_probe.REPORT_ID_FFB_STATUS:
+            return hid_probe.decode_ffb_status(data)
+    raise OSError("status report not readable")
+
+
+def diagnose(hid_module, out=print):
+    lines = []
+    found = open_status_device(hid_module, lines)
+    for line in lines:
+        out(line)
+    if found is None:
+        out("RESULT: the status report could not be read on any interface (see the lines above).")
+        return 2
+    out("RESULT: readable. Status: %s" % hid_probe.format_report(read_status(found[0])))
+    return 0
 
 
 def run(hid_module, log_path, interval, once=False, out=print, sleep=time.sleep, clock=time.time, max_loops=None):
@@ -170,6 +224,7 @@ def run(hid_module, log_path, interval, once=False, out=print, sleep=time.sleep,
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--once", action="store_true", help="read the status once and exit")
+    ap.add_argument("--diag", action="store_true", help="list the HID interfaces and every read attempt with its error, then exit")
     ap.add_argument("--log", default="wheel_log.txt", help="log file (appended); '' = no file")
     ap.add_argument("--interval", type=float, default=0.05, help="seconds between reads (default 0.05)")
     a = ap.parse_args(argv)
@@ -178,6 +233,9 @@ def main(argv=None):
     except ImportError:
         print("The 'hidapi' package is missing: run  py -m pip install hidapi")
         return 2
+    if a.diag:
+        print("hidapi module: %s" % getattr(hid, "__file__", "?"))
+        return diagnose(hid)
     print("Monitoring the wheel (VID %04X PID %04X). Ctrl+C stops. Log: %s" % (VID, PID, a.log or "(none)"))
     return run(hid, a.log or None, a.interval, once=a.once)
 

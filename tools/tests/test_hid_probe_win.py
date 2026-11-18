@@ -21,6 +21,8 @@ class FakeDevice:
         pass
 
     def get_feature_report(self, rid, n):
+        if getattr(self, "exact", None) and n != self.exact:
+            raise OSError("wrong length")
         if not self.reports:
             raise OSError("gone")
         item = self.reports.pop(0)
@@ -89,6 +91,21 @@ class TestRun(unittest.TestCase):
         self.assertIn("FFB RUNNING", text)
         self.assertIn("*** FAULT = OVERSPEED ***", text)
         self.assertIn("wheel NOT readable", text)
+
+    def test_finds_the_length_windows_wants(self):
+        good = struct.pack("<BBBBBBhHHHH", 0x40, 1, 3, 0, 0, 0x11, 500, 200, 150, 0, 241)
+        d = FakeDevice([good, good])
+        d.exact = 33
+        out = []
+        self.assertEqual(hid_probe_win.diagnose(FakeHid([d]), out=out.append), 0)
+        self.assertTrue(any("(0x40, 33): OK" in l for l in out))
+        self.assertTrue(any("wrong length" in l for l in out))
+
+    def test_diag_reports_failure(self):
+        d = FakeDevice([])
+        out = []
+        self.assertEqual(hid_probe_win.diagnose(FakeHid([d]), out=out.append), 2)
+        self.assertTrue(any("RESULT: the status report could not be read" in l for l in out))
 
     def test_once_without_device_returns_2(self):
         self.assertEqual(hid_probe_win.run(FakeHid([]), None, 0.0, once=True, out=lambda s: None), 2)
