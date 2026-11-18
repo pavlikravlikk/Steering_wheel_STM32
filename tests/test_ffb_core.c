@@ -690,6 +690,40 @@ TEST(test_torque_clamp_and_hard_cap)
   CHECK_NEAR(ffb_clamp(0.5f, NAN), 0.0, 0);
 }
 
+TEST(test_speed_filter_smooths_the_damper)
+{
+  ffb_torque_cfg_t c = tcfg_plain();
+  ffb_torque_state_t st;
+  ffb_axis_t ax = { 0.0f, 0.0f };
+  float a = 0.0f, prev = 0.0f;
+  c.vel_filter_hz = 15.0f;
+  c.regen_power_w = 0.0f;
+  c.slew_amps_per_s = 1.0e6f;
+  c.spring_curve_on = false; c.spring_kp = 0.0f; c.friction_amps = 0.0f; c.inertia_k = 0.0f;
+  c.damper_kd = 1.0f;
+  c.max_amps = 5.0f;
+  ffb_torque_reset(&st);
+  CHECK(ffb_torque_step(&c, &st, &ax, 0.0f, false, 0.005f, &a));
+  ax.vel_turns_s = 1.0f;                                        /* a step in the measured speed */
+  CHECK(ffb_torque_step(&c, &st, &ax, 0.0f, false, 0.005f, &a));
+  CHECK(a < 0.0f && a > -0.5f);                                 /* only a part of it in the first cycle (alpha 0.32) */
+  CHECK_NEAR(a, -0.3198, 2e-3);
+  for (int k = 0; k < 200; k++)
+  {
+    prev = a;
+    CHECK(ffb_torque_step(&c, &st, &ax, 0.0f, false, 0.005f, &a));
+    CHECK(a <= prev + 1e-6f);                                   /* monotonic approach, no overshoot */
+  }
+  CHECK_NEAR(a, -1.0, 1e-3);                                    /* and it settles at the full damping */
+  c.vel_filter_hz = 0.0f;                                       /* off: the raw speed */
+  ffb_torque_reset(&st);
+  ax.vel_turns_s = 0.0f;
+  CHECK(ffb_torque_step(&c, &st, &ax, 0.0f, false, 0.005f, &a));
+  ax.vel_turns_s = 1.0f;
+  CHECK(ffb_torque_step(&c, &st, &ax, 0.0f, false, 0.005f, &a));
+  CHECK_NEAR(a, -1.0, 1e-6);
+}
+
 TEST(test_spring_curve)
 {
   const float amps[FFB_SPRING_CURVE_N] = { 1.0f, 1.8f, 2.5f, 3.2f, 4.0f, 5.0f };
@@ -1056,6 +1090,7 @@ void run_ffb_core_tests(void)
   RUN(test_torque_spring_damper_friction_signs);
   RUN(test_torque_endstop_shape);
   RUN(test_torque_clamp_and_hard_cap);
+  RUN(test_speed_filter_smooths_the_damper);
   RUN(test_spring_curve);
   RUN(test_regen_limit);
   RUN(test_regen_limit_in_the_torque_step);

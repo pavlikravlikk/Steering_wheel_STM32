@@ -42,6 +42,7 @@ void ffb_torque_default_cfg(ffb_torque_cfg_t *cfg)
   cfg->endstop_damping = FFB_ENDSTOP_DAMPING;
   cfg->max_amps = FFB_MAX_AMPS;
   cfg->slew_amps_per_s = FFB_SLEW_AMPS_PER_S;
+  cfg->vel_filter_hz = FFB_VEL_FILTER_HZ;
   cfg->regen_power_w = FFB_REGEN_POWER_LIMIT_W;
   cfg->kt_nominal = FFB_TORQUE_CONSTANT_NOMINAL;
 }
@@ -50,7 +51,9 @@ void ffb_torque_reset(ffb_torque_state_t *st)
 {
   st->last_amps = 0.0f;
   st->last_vel = 0.0f;
+  st->vel_filt = 0.0f;
   st->have_vel = false;
+  st->have_vel_filt = false;
 }
 
 float ffb_clamp(float v, float limit)
@@ -244,7 +247,20 @@ bool ffb_torque_step(const ffb_torque_cfg_t *cfg, ffb_torque_state_t *st, const 
     return false;
   }
   limit = (cfg->max_amps < FFB_HARD_CAP_AMPS) ? cfg->max_amps : FFB_HARD_CAP_AMPS;
-  target = ffb_layer_a(cfg, st, ax, dt_s, spring_enabled) + host_amps;
+  {
+    /* The damper, the friction and the wall damping work on a filtered speed: the speed from the ODrive is quantised and noisy
+     * (one encoder count = 0.15 deg), and times a big gain that became small jerks in the force. */
+    ffb_axis_t fax = *ax;
+    if (cfg->vel_filter_hz > 0.0f)
+    {
+      const float rc = 1.0f / (6.2831853f * cfg->vel_filter_hz);
+      const float alpha = dt_s / (dt_s + rc);
+      st->vel_filt = st->have_vel_filt ? (st->vel_filt + (alpha * (ax->vel_turns_s - st->vel_filt))) : ax->vel_turns_s;
+      st->have_vel_filt = true;
+      fax.vel_turns_s = st->vel_filt;
+    }
+    target = ffb_layer_a(cfg, st, &fax, dt_s, spring_enabled) + host_amps;
+  }
   target = ffb_clamp(target, limit);
   target = ffb_regen_limit(target, ax->vel_turns_s, cfg->kt_nominal, cfg->regen_power_w);
   target = ffb_slew(st->last_amps, target, cfg->slew_amps_per_s, dt_s);

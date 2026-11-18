@@ -67,6 +67,7 @@ RANGES = [
     ("mcp23017", "address_7bit", int, 0x20, 0x27),
     ("ffb", "max_amps", float, 0.0, 6.0),
     ("ffb", "slew_amps_per_s", float, 0.01, 1000.0),
+    ("ffb", "vel_filter_hz", float, 0.0, 200.0),
     ("ffb", "host_gain", float, 0.1, 10.0),
     ("ffb", "gain_periodic", float, 0.0, 10.0),
     ("ffb", "gain_constant", float, 0.0, 10.0),
@@ -364,6 +365,7 @@ def gen_header(p):
     o = lambda k: val(p, "odrive", k)  # noqa: E731
     m("FFB_PROFILE_MAX_AMPS", c_float(f("max_amps")))
     m("FFB_SLEW_AMPS_PER_S", c_float(f("slew_amps_per_s")))
+    m("FFB_VEL_FILTER_HZ", c_float(f("vel_filter_hz")), "low-pass on the wheel speed for damper/friction (0 = off)")
     m("FFB_HOST_GAIN", c_float(f("host_gain")), "game force x gain, then clamped (max_amps is still the cap)")
     m("FFB_GAIN_PERIODIC", c_float(f("gain_periodic")), "game texture (sine/square/triangle/saw) x gain")
     m("FFB_GAIN_CONSTANT", c_float(f("gain_constant")), "game constant force / ramp x gain")

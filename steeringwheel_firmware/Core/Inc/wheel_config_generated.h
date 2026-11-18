@@ -60,7 +60,10 @@
 #define FFB_PROFILE_MAX_AMPS          5.0f
 #endif
 #ifndef FFB_SLEW_AMPS_PER_S
-#define FFB_SLEW_AMPS_PER_S           100.0f
+#define FFB_SLEW_AMPS_PER_S           40.0f
+#endif
+#ifndef FFB_VEL_FILTER_HZ
+#define FFB_VEL_FILTER_HZ             15.0f   /* low-pass on the wheel speed for damper/friction (0 = off) */
 #endif
 #ifndef FFB_HOST_GAIN
 #define FFB_HOST_GAIN                 1.0f   /* game force x gain, then clamped (max_amps is still the cap) */
@@ -84,16 +87,16 @@
 #define FFB_TORQUE_CONSTANT_NOMINAL   0.5f   /* Nm/A, only for the regeneration power estimate */
 #endif
 #ifndef FFB_SPRING_AMPS_90
-#define FFB_SPRING_AMPS_90            1.0f   /* centring force (A) at 90 deg from the centre */
+#define FFB_SPRING_AMPS_90            0.8f   /* centring force (A) at 90 deg from the centre */
 #endif
 #ifndef FFB_SPRING_AMPS_180
-#define FFB_SPRING_AMPS_180           1.8f   /* centring force (A) at 180 deg from the centre */
+#define FFB_SPRING_AMPS_180           1.5f   /* centring force (A) at 180 deg from the centre */
 #endif
 #ifndef FFB_SPRING_AMPS_270
-#define FFB_SPRING_AMPS_270           2.5f   /* centring force (A) at 270 deg from the centre */
+#define FFB_SPRING_AMPS_270           2.3f   /* centring force (A) at 270 deg from the centre */
 #endif
 #ifndef FFB_SPRING_AMPS_360
-#define FFB_SPRING_AMPS_360           3.2f   /* centring force (A) at 360 deg from the centre */
+#define FFB_SPRING_AMPS_360           3.1f   /* centring force (A) at 360 deg from the centre */
 #endif
 #ifndef FFB_SPRING_AMPS_450
 #define FFB_SPRING_AMPS_450           4.0f   /* centring force (A) at 450 deg from the centre */

@@ -36,6 +36,7 @@ typedef struct
   float endstop_damping;      /* A per wheel turn/s inside the wall        */
   float max_amps;             /* total clamp (<= FFB_HARD_CAP_AMPS)        */
   float slew_amps_per_s;
+  float vel_filter_hz;        /* low-pass on the wheel speed used by damper, friction, wall damping (0 = off) */
   float regen_power_w;        /* mechanical power the motor may take OUT of the wheel (0 = no limit)  */
   float kt_nominal;           /* Nm per A (profile), only for that power estimate                     */
 } ffb_torque_cfg_t;
@@ -44,7 +45,9 @@ typedef struct
 {
   float last_amps;            /* output of the slew limiter                */
   float last_vel;
+  float vel_filt;             /* filtered wheel speed (turns/s) */
   bool  have_vel;
+  bool  have_vel_filt;
 } ffb_torque_state_t;
 
 /** Wheel kinematics in the motor frame. */
