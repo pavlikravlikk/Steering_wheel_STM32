@@ -62,6 +62,7 @@ typedef struct
   float constant;        /* constant, ramp (cornering, impacts)                  */
   float condition;       /* spring, damper, inertia, friction                    */
   float periodic_cap;    /* the periodic part alone is limited to +-this (normalised, 0..1) */
+  float constant_filter_hz; /* low-pass on the constant / ramp part (0 = off): the game changes that force in steps */
   float direction_sign;  /* +1, or -1 = the direction of constant / ramp / periodic effects is mirrored (conditions are not) */
 } ffb_fx_gains_t;
 
@@ -75,6 +76,8 @@ typedef struct
   /* result of the last Create New Effect (Block Load report) */
   uint8_t  bl_index;
   uint8_t  bl_status;        /* FFB_BL_*                                   */
+  float    constant_filt;     /* filtered constant / ramp sum                */
+  bool     have_constant_filt;
   /* inertia needs acceleration */
   float    last_vel;
   uint32_t last_ms;
@@ -92,6 +95,9 @@ void ffb_fx_set_gains(ffb_fx_engine_t *e, float periodic, float constant, float 
  *  the opposite of ours (a constant force that pushes the wheel AWAY from the centre where it should pull back). Spring, damper,
  *  friction and inertia depend on the wheel's own position or speed and are never mirrored. */
 void ffb_fx_set_direction_invert(ffb_fx_engine_t *e, bool invert);
+
+/** Low-pass (Hz) on the game's constant force and ramp only (texture and conditions stay as they are). 0 or less = off. */
+void ffb_fx_set_constant_filter(ffb_fx_engine_t *e, float hz);
 
 /** PID Device Reset: stop and free everything, defaults back. */
 void ffb_fx_reset(ffb_fx_engine_t *e);

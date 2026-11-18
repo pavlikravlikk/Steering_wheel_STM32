@@ -75,6 +75,11 @@ void ffb_fx_set_gains(ffb_fx_engine_t *e, float periodic, float constant, float 
   e->gains.periodic_cap = (finite_f(periodic_cap) && (periodic_cap > 0.0f) && (periodic_cap < 1.0f)) ? periodic_cap : 1.0f;
 }
 
+void ffb_fx_set_constant_filter(ffb_fx_engine_t *e, float hz)
+{
+  e->gains.constant_filter_hz = (finite_f(hz) && (hz > 0.0f)) ? hz : 0.0f;
+}
+
 void ffb_fx_set_direction_invert(ffb_fx_engine_t *e, bool invert)
 {
   e->gains.direction_sign = invert ? -1.0f : 1.0f;
@@ -103,6 +108,8 @@ void ffb_fx_reset(ffb_fx_engine_t *e)
   e->bl_index = 0U;
   e->bl_status = FFB_BL_PENDING;
   e->have_vel = false;
+  e->constant_filt = 0.0f;
+  e->have_constant_filt = false;
 }
 
 static bool index_ok(uint8_t index)
@@ -392,6 +399,7 @@ float ffb_fx_force(ffb_fx_engine_t *e, uint32_t now_ms, float pos, float vel, bo
   float ksum = 0.0f;                       /* conditions: spring, damper, friction, inertia */
   float sum;
   float accel = 0.0f;
+  float dt_s = 0.0f;                       /* time since the previous call (for the constant-force filter) */
   bool any = false;
 
   if (!finite_f(pos) || !finite_f(vel))
@@ -403,6 +411,11 @@ float ffb_fx_force(ffb_fx_engine_t *e, uint32_t now_ms, float pos, float vel, bo
   {
     accel = clampf(((vel - e->last_vel) * 1000.0f / (float)(now_ms - e->last_ms)) / ACCEL_FULL_SCALE,
                    -1.0f, 1.0f);
+  }
+  if (e->have_vel && (now_ms != e->last_ms))
+  {
+    const uint32_t d = now_ms - e->last_ms;
+    dt_s = (float)((d > 100U) ? 100U : d) / 1000.0f;
   }
   e->last_vel = vel;
   e->last_ms = now_ms;
@@ -433,6 +446,17 @@ float ffb_fx_force(ffb_fx_engine_t *e, uint32_t now_ms, float pos, float vel, bo
   {
     *active = false;
     return 0.0f;
+  }
+  if (e->gains.constant_filter_hz > 0.0f)
+  {
+    /* the game changes its constant force in steps (about 60 times a second): a wheel that is pushed by those steps jerks.
+     * A first-order low-pass turns each step into a short ramp; gravel (periodic) and the conditions are not filtered. */
+    const float dt = dt_s;
+    const float rc = 1.0f / (6.2831853f * e->gains.constant_filter_hz);
+    const float alpha = dt / (dt + rc);
+    e->constant_filt = e->have_constant_filt ? (e->constant_filt + (alpha * (csum - e->constant_filt))) : csum;
+    e->have_constant_filt = true;
+    csum = e->constant_filt;
   }
   psum = clampf(psum, -e->gains.periodic_cap, e->gains.periodic_cap);
   sum = (psum + csum + ksum) * ((float)e->device_gain / 255.0f);

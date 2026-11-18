@@ -74,6 +74,9 @@
 #ifndef FFB_STOP_AMPS
 #define FFB_STOP_AMPS                 5.0f   /* soft stop force at stop_full_deg */
 #endif
+#ifndef FFB_CONSTANT_FILTER_HZ
+#define FFB_CONSTANT_FILTER_HZ        6.0f   /* low-pass on the game constant force / ramp (0 = off) */
+#endif
 #ifndef FFB_VEL_FILTER_HZ
 #define FFB_VEL_FILTER_HZ             12.0f   /* low-pass on the wheel speed for damper/friction (0 = off) */
 #endif
@@ -87,7 +90,7 @@
 #define FFB_GAIN_PERIODIC             8.0f   /* game texture (sine/square/triangle/saw) x gain */
 #endif
 #ifndef FFB_GAIN_CONSTANT
-#define FFB_GAIN_CONSTANT             1.5f   /* game constant force / ramp x gain */
+#define FFB_GAIN_CONSTANT             1.2f   /* game constant force / ramp x gain */
 #endif
 #ifndef FFB_GAIN_CONDITION
 #define FFB_GAIN_CONDITION            1.0f   /* game spring/damper/friction/inertia x gain (keep low: closed loop) */

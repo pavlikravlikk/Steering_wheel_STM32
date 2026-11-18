@@ -378,6 +378,49 @@ TEST(test_fx_direction_invert_leaves_conditions_alone)
   CHECK_NEAR(force(10, 0, 0), 0.5, 2e-3);                            /* back to normal */
 }
 
+/* The constant force is low-passed (the game changes it in steps); the texture and the conditions are not. */
+TEST(test_fx_constant_filter_smooths_steps)
+{
+  const uint8_t per[] = { FFB_RID_SET_PERIODIC, 1, 0x10, 0x27, 0, 0, 0, 0, 100, 0 };
+  float prev = 0.0f, f = 0.0f;
+  fresh();
+  ffb_fx_set_constant_filter(&E, 6.0f);
+  create(FFB_ET_CONSTANT);
+  set_effect(1, FFB_ET_CONSTANT, FFB_TIME_INFINITE, 0, 255, 9000);
+  set_constant(1, 0);
+  op(1, FFB_OP_START, 1, 0);
+  CHECK_NEAR(force(0, 0, 0), 0.0, 1e-6);
+  CHECK_NEAR(force(5, 0, 0), 0.0, 1e-6);
+  set_constant(1, 10000);                                      /* a step to full scale */
+  f = force(10, 0, 0);
+  CHECK(f > 0.0f && f < 0.3f);                                 /* only the start of the ramp (alpha 0.12) */
+  for (uint32_t t = 15; t < 400; t += 5)
+  {
+    prev = f;
+    f = force(t, 0, 0);
+    CHECK(f >= prev - 1e-6f);                                  /* monotonic, no overshoot */
+  }
+  CHECK_NEAR(f, 1.0, 5e-3);                                    /* and it arrives */
+  /* off: the step passes at once */
+  fresh();
+  ffb_fx_set_constant_filter(&E, 0.0f);
+  create(FFB_ET_CONSTANT);
+  set_effect(1, FFB_ET_CONSTANT, FFB_TIME_INFINITE, 0, 255, 9000);
+  set_constant(1, 0);
+  op(1, FFB_OP_START, 1, 0);
+  (void)force(0, 0, 0);
+  set_constant(1, 10000);
+  CHECK_NEAR(force(5, 0, 0), 1.0, 1e-6);
+  /* the texture is not filtered: a sine reaches its peak at a quarter of the period */
+  fresh();
+  ffb_fx_set_constant_filter(&E, 6.0f);
+  create(FFB_ET_SINE);
+  set_effect(1, FFB_ET_SINE, FFB_TIME_INFINITE, 0, 255, 9000);
+  CHECK(out(per, sizeof(per), 0));
+  op(1, FFB_OP_START, 1, 0);
+  CHECK_NEAR(force(25, 0, 0), 1.0, 0.012);
+}
+
 TEST(test_fx_damper_friction_inertia)
 {
   fresh();
@@ -549,6 +592,7 @@ void run_ffb_pid_tests(void)
   RUN(test_fx_ramp);
   RUN(test_fx_spring_condition);
   RUN(test_fx_gains_per_kind);
+  RUN(test_fx_constant_filter_smooths_steps);
   RUN(test_fx_direction_invert_leaves_conditions_alone);
   RUN(test_fx_damper_friction_inertia);
   RUN(test_fx_device_control_and_safety);
