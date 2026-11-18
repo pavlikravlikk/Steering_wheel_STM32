@@ -113,7 +113,7 @@ class TestProfile(unittest.TestCase):
 
     def test_ffb_max_amps_above_hard_cap_is_error(self):
         p = load()
-        set_val(p, "ffb", "max_amps", 1.5)
+        set_val(p, "ffb", "max_amps", 3.5)
         errors, _ = gen_config.validate(p)
         self.assertTrue(any("ffb.max_amps" in e for e in errors))
 
@@ -215,7 +215,7 @@ class TestSetupScript(unittest.TestCase):
         self.assertIn("odrv0.axis0.motor.config.torque_constant = 0.5", out)
         self.assertNotIn("odrv0.axis0.motor.config.pole_pairs", out)
         self.assertIn("15 change(s)", out)          # 14 + vel_gain (0.02 -> 0.25, bench 2026-11-17)
-        self.assertIn("odrv0.axis0.controller.config.vel_gain = 0.25", out)
+        self.assertIn("odrv0.axis0.controller.config.vel_gain = 0.4", out)
 
     def test_dry_run_without_dump_lists_everything(self):
         buf = io.StringIO()

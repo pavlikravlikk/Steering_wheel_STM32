@@ -16,7 +16,9 @@
 /* change that must be reviewed together with docs/FFB_SAFETY.md).           */
 /* ------------------------------------------------------------------------- */
 /* Absolute ceiling of the commanded current, whatever the profile says. */
-#define FFB_HARD_CAP_AMPS               1.0f
+/* 2026-11-18 (owner decision): 1.0 -> 3.0 A (about 1.5 Nm). The wheel is still DISMOUNTED; the conditions in docs/FFB_SAFETY.md
+ * section 5 (mechanical stop, hardware e-stop, OVERSPEED test) are NOT met yet: do not mount the wheel at this value. */
+#define FFB_HARD_CAP_AMPS               3.0f
 
 #define FFB_MAX_AMPS \
   ((FFB_PROFILE_MAX_AMPS < FFB_HARD_CAP_AMPS) ? FFB_PROFILE_MAX_AMPS : FFB_HARD_CAP_AMPS)
@@ -117,7 +119,7 @@
 /* Friction: full force above this wheel speed (turns/s), linear below. */
 #define FFB_FRICTION_VEL_EPS            0.05f
 
-_Static_assert(FFB_HARD_CAP_AMPS <= 1.0f, "FFB hard cap above 1 A needs a reviewed safety case");
+_Static_assert(FFB_HARD_CAP_AMPS <= 3.0f, "FFB hard cap above 3 A needs a reviewed safety case");
 _Static_assert(FFB_COMMAND_PERIOD_MS >= 1U, "command period");
 _Static_assert(FFB_STALE_MS >= 3U * FFB_COMMAND_PERIOD_MS, "stale window too short");
 _Static_assert(FFB_PRECHECK_READ_EVERY >= 2U, "reads every cycle starve the position request");

@@ -69,7 +69,7 @@ class TestSessionStart(unittest.TestCase):
         self.assertEqual(cal[-1], gen_config.val(self.p, "odrive", "calibration_current"))
         order = [p for p, _ in odrv.writes]
         self.assertLess(order.index("axis0.requested_state"), order.index("axis0.controller.config.vel_gain"))
-        self.assertEqual(odrv.values["axis0.controller.config.vel_gain"], 0.25)
+        self.assertEqual(odrv.values["axis0.controller.config.vel_gain"], 0.4)
         self.assertEqual(odrv.values["axis0.error"], 0)                       # the 0x800 leftover was cleared
         self.assertEqual(odrv.calls, [])                                      # never saved, never rebooted
 

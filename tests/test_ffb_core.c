@@ -26,7 +26,7 @@ TEST(test_cmd_formatting)
   ffb_fmt_torque(b, sizeof(b), 0, -0.00001f);           /* no "-0.0000" */
   CHECK(strcmp(b, "w axis0.controller.input_torque 0.0000\n") == 0);
   ffb_fmt_torque(b, sizeof(b), 0, 1000.0f);              /* clamped */
-  CHECK(strcmp(b, "w axis0.controller.input_torque 2.0000\n") == 0);
+  CHECK(strcmp(b, "w axis0.controller.input_torque 6.0000\n") == 0);
   ffb_fmt_torque(b, sizeof(b), 0, NAN);                  /* NaN -> 0 */
   CHECK(strcmp(b, "w axis0.controller.input_torque 0.0000\n") == 0);
   CHECK(ffb_fmt_state(b, sizeof(b), 0, 8) > 0);
@@ -65,7 +65,7 @@ TEST(test_cmd_allowlist_rejects_config_and_everything_else)
     "w axis0.motor.config.torque_constant 1\n", "w axis0.controller.input_pos 1.0000\n",
     "w axis0.controller.input_vel 1.0000\n", "ss\n", "se\n", "sr\n", "sc\n", "sb\n",
     "c 0 1.0\n", "p 0 1 0 0\n", "v 0 1\n", "t 0 1\n", "q 0 1\n", "u 1\n", "u 0", "u 00\n",
-    "w axis0.controller.input_torque 2.1000\n",          /* above the cap */
+    "w axis0.controller.input_torque 6.1000\n",          /* above the cap (3 A x 2 Nm/A) */
     "w axis0.controller.input_torque 1e3\n", "w axis0.controller.input_torque nan\n",
     "w axis0.controller.input_torque 0.000\n", "w axis0.controller.input_torque 0.00000\n",
     "w axis0.controller.input_torque .5000\n", "w axis0.controller.input_torque 100.0000\n",
@@ -625,7 +625,7 @@ TEST(test_torque_defaults_are_gentle)
 {
   ffb_torque_cfg_t c = tcfg_plain();
   CHECK(c.max_amps <= FFB_HARD_CAP_AMPS);
-  CHECK(c.max_amps <= 1.0f);
+  CHECK(c.max_amps <= 3.0f);
   CHECK(c.spring_kp <= 4.0f);   /* 1.0 until 2026-11-17; raised on purpose (owner): 1.5 for F5 step 2, 3.0 for more resistance */
   CHECK_NEAR(c.half_range_turns, WHEEL_LOCK_TO_LOCK_DEG / 720.0, 1e-6);  /* half of the lock-to-lock (tests pin 540 deg: 0.75 turn) */
 }
@@ -699,7 +699,7 @@ TEST(test_torque_slew_limiter)
   ffb_torque_reset(&st);
   for (int k = 0; k < 400; k++)
   {
-    CHECK(ffb_torque_step(&c, &st, &ax, 1.0f, false, 0.005f, &a));
+    CHECK(ffb_torque_step(&c, &st, &ax, 5.0f, false, 0.005f, &a));
     CHECK(a - prev <= c.slew_amps_per_s * 0.005f + 1e-6f);
     prev = a;
   }

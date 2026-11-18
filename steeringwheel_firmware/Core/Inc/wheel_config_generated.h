@@ -57,7 +57,7 @@
 
 /* --- FFB limits (used only with -DWHEEL_FFB=ON) ----------------------- */
 #ifndef FFB_PROFILE_MAX_AMPS
-#define FFB_PROFILE_MAX_AMPS          1.0f
+#define FFB_PROFILE_MAX_AMPS          3.0f
 #endif
 #ifndef FFB_SLEW_AMPS_PER_S
 #define FFB_SLEW_AMPS_PER_S           100.0f
@@ -81,7 +81,7 @@
 #define FFB_ENDSTOP_WIDTH_DEG         10.0f
 #endif
 #ifndef FFB_ENDSTOP_AMPS
-#define FFB_ENDSTOP_AMPS              1.0f
+#define FFB_ENDSTOP_AMPS              3.0f
 #endif
 #ifndef FFB_ENDSTOP_DAMPING
 #define FFB_ENDSTOP_DAMPING           0.3f
