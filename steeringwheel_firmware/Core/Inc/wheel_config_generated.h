@@ -66,16 +66,16 @@
 #define FFB_HOST_GAIN                 1.0f   /* game force x gain, then clamped (max_amps is still the cap) */
 #endif
 #ifndef FFB_GAIN_PERIODIC
-#define FFB_GAIN_PERIODIC             5.0f   /* game texture (sine/square/triangle/saw) x gain */
+#define FFB_GAIN_PERIODIC             2.0f   /* game texture (sine/square/triangle/saw) x gain */
 #endif
 #ifndef FFB_GAIN_CONSTANT
-#define FFB_GAIN_CONSTANT             2.0f   /* game constant force / ramp x gain */
+#define FFB_GAIN_CONSTANT             1.5f   /* game constant force / ramp x gain */
 #endif
 #ifndef FFB_GAIN_CONDITION
 #define FFB_GAIN_CONDITION            1.0f   /* game spring/damper/friction/inertia x gain (keep low: closed loop) */
 #endif
 #ifndef FFB_PERIODIC_MAX_AMPS
-#define FFB_PERIODIC_MAX_AMPS         1.5f   /* the periodic part alone is limited to this (A) */
+#define FFB_PERIODIC_MAX_AMPS         0.6f   /* the periodic part alone is limited to this (A) */
 #endif
 #ifndef FFB_REGEN_POWER_LIMIT_W
 #define FFB_REGEN_POWER_LIMIT_W       20.0f   /* W the motor may take out of the wheel (braking power limit, 0 = off) */
