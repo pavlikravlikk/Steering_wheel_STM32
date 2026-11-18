@@ -60,7 +60,7 @@
 #define FFB_PROFILE_MAX_AMPS          5.0f
 #endif
 #ifndef FFB_SLEW_AMPS_PER_S
-#define FFB_SLEW_AMPS_PER_S           40.0f
+#define FFB_SLEW_AMPS_PER_S           80.0f
 #endif
 #ifndef FFB_VEL_FILTER_HZ
 #define FFB_VEL_FILTER_HZ             15.0f   /* low-pass on the wheel speed for damper/friction (0 = off) */
@@ -75,7 +75,7 @@
 #define FFB_GAIN_PERIODIC             5.0f   /* game texture (sine/square/triangle/saw) x gain */
 #endif
 #ifndef FFB_GAIN_CONSTANT
-#define FFB_GAIN_CONSTANT             2.0f   /* game constant force / ramp x gain */
+#define FFB_GAIN_CONSTANT             1.5f   /* game constant force / ramp x gain */
 #endif
 #ifndef FFB_GAIN_CONDITION
 #define FFB_GAIN_CONDITION            1.0f   /* game spring/damper/friction/inertia x gain (keep low: closed loop) */
@@ -90,19 +90,19 @@
 #define FFB_TORQUE_CONSTANT_NOMINAL   0.5f   /* Nm/A, only for the regeneration power estimate */
 #endif
 #ifndef FFB_SPRING_AMPS_90
-#define FFB_SPRING_AMPS_90            0.8f   /* centring force (A) at 90 deg from the centre */
+#define FFB_SPRING_AMPS_90            0.6f   /* centring force (A) at 90 deg from the centre */
 #endif
 #ifndef FFB_SPRING_AMPS_180
-#define FFB_SPRING_AMPS_180           1.5f   /* centring force (A) at 180 deg from the centre */
+#define FFB_SPRING_AMPS_180           1.2f   /* centring force (A) at 180 deg from the centre */
 #endif
 #ifndef FFB_SPRING_AMPS_270
-#define FFB_SPRING_AMPS_270           2.3f   /* centring force (A) at 270 deg from the centre */
+#define FFB_SPRING_AMPS_270           1.8f   /* centring force (A) at 270 deg from the centre */
 #endif
 #ifndef FFB_SPRING_AMPS_360
-#define FFB_SPRING_AMPS_360           3.1f   /* centring force (A) at 360 deg from the centre */
+#define FFB_SPRING_AMPS_360           2.4f   /* centring force (A) at 360 deg from the centre */
 #endif
 #ifndef FFB_SPRING_AMPS_450
-#define FFB_SPRING_AMPS_450           4.0f   /* centring force (A) at 450 deg from the centre */
+#define FFB_SPRING_AMPS_450           3.4f   /* centring force (A) at 450 deg from the centre */
 #endif
 #ifndef FFB_SPRING_AMPS_540
 #define FFB_SPRING_AMPS_540           5.0f   /* centring force (A) at 540 deg from the centre */
@@ -111,10 +111,10 @@
 #define FFB_SPRING_KP                 3.0f   /* A per wheel turn */
 #endif
 #ifndef FFB_DAMPER_KD
-#define FFB_DAMPER_KD                 1.6f   /* A per wheel turn/s */
+#define FFB_DAMPER_KD                 0.5f   /* A per wheel turn/s */
 #endif
 #ifndef FFB_FRICTION_AMPS
-#define FFB_FRICTION_AMPS             0.12f
+#define FFB_FRICTION_AMPS             0.05f
 #endif
 #ifndef FFB_INERTIA_KI
 #define FFB_INERTIA_KI                0.0f   /* placeholder */
