@@ -43,7 +43,7 @@ CubeMX/CMake firmware, host tools (all Python standard library) and a visualizer
 | `project_status.py` | `make status`: TBD list, blockers, TODO(TBD) markers, test results |
 | `session_start.py` | start of a session after an ODrive power-up or an STM32 restart: errors with names, calibration, profile to RAM, verdict |
 | `ff_play.py`, `ff_soak.py` | play one force effect / imitate a game session without a game (Linux) |
-| `hid_probe_win.py` | the same FFB status on **Windows** (needs `py -m pip install hidapi` and `hid_probe.py` next to it): live monitor with a log file; on a FAULT it also logs the last ~2 s before it |
+| `hid_status_log.py` | the same FFB status with a log, for the laptop that runs the game: **Linux** (hidraw, no packages) or Windows (`py -m pip install hidapi`); needs `hid_probe.py` next to it: live monitor with a log file; on a FAULT it also logs the last ~2 s before it |
 | `wheel_status.html` | read-only WebHID monitor of the FFB status report (Chrome/Edge only, NOT Firefox) |
 | `odrive_dump.py` | parser of ODrive property dumps (IPython and flat formats), used by the status tool and the tests |
 | `check_all.sh`, `mutation_test.sh` | full host verification |

@@ -1,15 +1,18 @@
 #!/usr/bin/env python3
-"""Read the wheel's FFB status (state, pre-arm reason, FAULT, current, supply) on WINDOWS (or any OS with hidapi) and keep a log.
+"""Read the wheel's FFB status (state, pre-arm reason, FAULT, current, supply) and keep a log. Linux and Windows.
 
-Setup (once, on the laptop where the wheel is plugged into USB USER):
+Linux (any laptop where the wheel is plugged into USB USER; no extra packages, uses /dev/hidrawN):
+    python3 hid_status_log.py              # needs hid_probe.py in the same folder and the udev rule
+                                           # (tools/99-steeringwheel.rules) or  sudo python3 hid_status_log.py
+Windows:
     py -m pip install hidapi
-    copy tools\\hid_probe.py and tools\\hid_probe_win.py into one folder (this script imports hid_probe for the decoding)
+    py hid_status_log.py                   # needs hid_probe.py in the same folder
 
-Run:
-    py hid_probe_win.py              # live monitor, appends to wheel_log.txt, Ctrl+C stops
-    py hid_probe_win.py --once       # read the status once and exit
-    py hid_probe_win.py --diag       # 'wheel NOT readable'? shows every interface and every attempt with its error
-    py hid_probe_win.py --log C:\\x\\game.txt --interval 0.05
+Options:
+    --once          read the status once and exit
+    --diag          'wheel NOT readable'? shows every interface and every attempt with its error
+    --log FILE      log file (appended, default wheel_log.txt; '' = none)
+    --interval S    seconds between reads (default 0.05)
 
 What it writes (only changes, so the file stays small):
   * every change of state / pre-arm reason / fault / flags, with a time stamp;
@@ -94,6 +97,43 @@ class Monitor:
             return []
         self.present = False
         return ["%s  wheel NOT readable (unplugged, STM32 reset, or held by another program)" % self._stamp(now)]
+
+
+class HidrawDevice:
+    """Linux: the same small interface as hidapi's device, on top of /dev/hidrawN (no packages needed)."""
+
+    def __init__(self):
+        self.path = None
+
+    def open_path(self, path):
+        self.path = path
+        fd = os.open(path, os.O_RDWR)          # raises OSError (permission: udev rule or sudo)
+        os.close(fd)
+
+    def get_feature_report(self, report_id, length):
+        return list(hid_probe.read_feature(self.path, report_id, length))
+
+    def close(self):
+        self.path = None
+
+
+class HidrawModule:
+    @staticmethod
+    def enumerate(vid, pid):
+        import glob  # noqa: PLC0415
+        found = []
+        for uevent in sorted(glob.glob("/sys/class/hidraw/hidraw*/device/uevent")):
+            try:
+                text = open(uevent, encoding="utf-8").read()
+            except OSError:
+                continue
+            if "HID_ID=" in text and ("%04X" % vid) in text.upper() and ("%04X" % pid) in text.upper():
+                found.append({"path": "/dev/" + uevent.split("/")[4]})
+        return found
+
+    @staticmethod
+    def device():
+        return HidrawDevice()
 
 
 # Windows' HidD_GetFeature wants the buffer length to match the feature report size of the interface, which depends on the
@@ -228,11 +268,14 @@ def main(argv=None):
     ap.add_argument("--log", default="wheel_log.txt", help="log file (appended); '' = no file")
     ap.add_argument("--interval", type=float, default=0.05, help="seconds between reads (default 0.05)")
     a = ap.parse_args(argv)
-    try:
-        import hid  # noqa: PLC0415
-    except ImportError:
-        print("The 'hidapi' package is missing: run  py -m pip install hidapi")
-        return 2
+    if sys.platform.startswith("linux"):
+        hid = HidrawModule
+    else:
+        try:
+            import hid  # noqa: PLC0415
+        except ImportError:
+            print("The 'hidapi' package is missing: run  py -m pip install hidapi")
+            return 2
     if a.diag:
         print("hidapi module: %s" % getattr(hid, "__file__", "?"))
         return diagnose(hid)

@@ -5,7 +5,7 @@ import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 import hid_probe  # noqa: E402
-import hid_probe_win  # noqa: E402
+import hid_status_log  # noqa: E402
 
 
 def status(state=0, reason=0, fault=0, flags=0, ma=0, rate=200, loop=150, to=0, dv=241):
@@ -48,7 +48,7 @@ class FakeHid:
 
 class TestMonitor(unittest.TestCase):
     def test_logs_only_changes_and_the_fault_with_history(self):
-        m = hid_probe_win.Monitor()
+        m = hid_status_log.Monitor()
         lines = []
         for i in range(5):
             lines += m.feed(100.0 + i * 0.05, status(state=3, flags=0x11, ma=2000 + i, dv=241 + i))
@@ -60,13 +60,13 @@ class TestMonitor(unittest.TestCase):
         self.assertEqual(sum(l.startswith("    ") for l in lines2), 5)       # the 5 samples before it
 
     def test_summary_every_10_s(self):
-        m = hid_probe_win.Monitor()
+        m = hid_status_log.Monitor()
         m.feed(0.0, status())
         out = m.feed(10.5, status(ma=-3000, dv=250))
         self.assertTrue(any("summary: peak" in l for l in out))
 
     def test_lost_and_back(self):
-        m = hid_probe_win.Monitor()
+        m = hid_status_log.Monitor()
         m.feed(0.0, status())
         self.assertEqual(len(m.lost(1.0)), 1)
         self.assertEqual(m.lost(2.0), [])                                      # not repeated
@@ -85,7 +85,7 @@ class TestRun(unittest.TestCase):
             t[0] += 0.05
             return t[0]
 
-        rc = hid_probe_win.run(h, None, 0.0, out=out.append, sleep=lambda s: None, clock=clock, max_loops=6)
+        rc = hid_status_log.run(h, None, 0.0, out=out.append, sleep=lambda s: None, clock=clock, max_loops=6)
         self.assertEqual(rc, 0)
         text = "\n".join(out)
         self.assertIn("FFB RUNNING", text)
@@ -97,18 +97,21 @@ class TestRun(unittest.TestCase):
         d = FakeDevice([good, good])
         d.exact = 33
         out = []
-        self.assertEqual(hid_probe_win.diagnose(FakeHid([d]), out=out.append), 0)
+        self.assertEqual(hid_status_log.diagnose(FakeHid([d]), out=out.append), 0)
         self.assertTrue(any("(0x40, 33): OK" in l for l in out))
         self.assertTrue(any("wrong length" in l for l in out))
 
     def test_diag_reports_failure(self):
         d = FakeDevice([])
         out = []
-        self.assertEqual(hid_probe_win.diagnose(FakeHid([d]), out=out.append), 2)
+        self.assertEqual(hid_status_log.diagnose(FakeHid([d]), out=out.append), 2)
         self.assertTrue(any("RESULT: the status report could not be read" in l for l in out))
 
+    def test_hidraw_adapter_reports_no_device_cleanly(self):
+        self.assertEqual(hid_status_log.HidrawModule.enumerate(0x0483, 0x5752) is not None, True)
+
     def test_once_without_device_returns_2(self):
-        self.assertEqual(hid_probe_win.run(FakeHid([]), None, 0.0, once=True, out=lambda s: None), 2)
+        self.assertEqual(hid_status_log.run(FakeHid([]), None, 0.0, once=True, out=lambda s: None), 2)
 
 
 if __name__ == "__main__":
