@@ -64,6 +64,7 @@ void ffb_fx_init(ffb_fx_engine_t *e)
   memset(e, 0, sizeof(*e));
   ffb_fx_set_gains(e, 1.0f, 1.0f, 1.0f, 1.0f);
   e->gains.direction_sign = 1.0f;
+  e->gains.constant_cap = 1.0f;
   ffb_fx_reset(e);
 }
 
@@ -73,6 +74,11 @@ void ffb_fx_set_gains(ffb_fx_engine_t *e, float periodic, float constant, float 
   e->gains.constant = (finite_f(constant) && (constant >= 0.0f)) ? constant : 1.0f;
   e->gains.condition = (finite_f(condition) && (condition >= 0.0f)) ? condition : 1.0f;
   e->gains.periodic_cap = (finite_f(periodic_cap) && (periodic_cap > 0.0f) && (periodic_cap < 1.0f)) ? periodic_cap : 1.0f;
+}
+
+void ffb_fx_set_constant_cap(ffb_fx_engine_t *e, float cap)
+{
+  e->gains.constant_cap = (finite_f(cap) && (cap > 0.0f) && (cap < 1.0f)) ? cap : 1.0f;
 }
 
 void ffb_fx_set_constant_filter(ffb_fx_engine_t *e, float hz)
@@ -457,6 +463,10 @@ float ffb_fx_force(ffb_fx_engine_t *e, uint32_t now_ms, float pos, float vel, bo
     e->constant_filt = e->have_constant_filt ? (e->constant_filt + (alpha * (csum - e->constant_filt))) : csum;
     e->have_constant_filt = true;
     csum = e->constant_filt;
+  }
+  if (e->gains.constant_cap < 1.0f)
+  {
+    csum = clampf(csum, -e->gains.constant_cap, e->gains.constant_cap);   /* an impact is a jolt, not a throw */
   }
   psum = clampf(psum, -e->gains.periodic_cap, e->gains.periodic_cap);
   sum = (psum + csum + ksum) * ((float)e->device_gain / 255.0f);

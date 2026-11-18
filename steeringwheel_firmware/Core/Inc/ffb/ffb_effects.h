@@ -62,6 +62,7 @@ typedef struct
   float constant;        /* constant, ramp (cornering, impacts)                  */
   float condition;       /* spring, damper, inertia, friction                    */
   float periodic_cap;    /* the periodic part alone is limited to +-this (normalised, 0..1) */
+  float constant_cap;       /* the constant / ramp part alone is limited to +-this (normalised, 0..1): crashes, skids */
   float constant_filter_hz; /* low-pass on the constant / ramp part (0 = off): the game changes that force in steps */
   float direction_sign;  /* +1, or -1 = the direction of constant / ramp / periodic effects is mirrored (conditions are not) */
 } ffb_fx_gains_t;
@@ -98,6 +99,10 @@ void ffb_fx_set_direction_invert(ffb_fx_engine_t *e, bool invert);
 
 /** Low-pass (Hz) on the game's constant force and ramp only (texture and conditions stay as they are). 0 or less = off. */
 void ffb_fx_set_constant_filter(ffb_fx_engine_t *e, float hz);
+
+/** Limit of the constant force and ramp alone (a crash, a skid, the self-aligning force), normalised 0..1; 0 or >= 1 = no limit.
+ *  A full-scale crash force on a light rotor throws the wheel for almost two turns; this keeps an impact a jolt. */
+void ffb_fx_set_constant_cap(ffb_fx_engine_t *e, float cap);
 
 /** PID Device Reset: stop and free everything, defaults back. */
 void ffb_fx_reset(ffb_fx_engine_t *e);

@@ -421,6 +421,34 @@ TEST(test_fx_constant_filter_smooths_steps)
   CHECK_NEAR(force(25, 0, 0), 1.0, 0.012);
 }
 
+/* The strength of an impact: the constant force and ramp alone are limited, the texture and the conditions are not. */
+TEST(test_fx_constant_cap_limits_the_impact_only)
+{
+  const uint8_t per[] = { FFB_RID_SET_PERIODIC, 1, 0x10, 0x27, 0, 0, 0, 0, 100, 0 };
+  fresh();
+  ffb_fx_set_constant_filter(&E, 0.0f);
+  ffb_fx_set_constant_cap(&E, 0.4f);
+  create(FFB_ET_CONSTANT);
+  set_effect(1, FFB_ET_CONSTANT, FFB_TIME_INFINITE, 0, 255, 9000);
+  set_constant(1, 10000);                                      /* a full-scale crash */
+  op(1, FFB_OP_START, 1, 0);
+  CHECK_NEAR(force(10, 0, 0), 0.4, 1e-6);
+  set_constant(1, 2000);                                       /* a weak force below the cap passes unchanged */
+  CHECK_NEAR(force(20, 0, 0), 0.2, 2e-3);
+  set_effect(1, FFB_ET_CONSTANT, FFB_TIME_INFINITE, 0, 255, 27000);   /* the other side */
+  set_constant(1, 10000);
+  CHECK_NEAR(force(30, 0, 0), -0.4, 1e-6);
+  fresh();
+  ffb_fx_set_constant_cap(&E, 0.1f);
+  create(FFB_ET_SINE);                                         /* the texture does not go through that limit */
+  set_effect(1, FFB_ET_SINE, FFB_TIME_INFINITE, 0, 255, 9000);
+  CHECK(out(per, sizeof(per), 0));
+  op(1, FFB_OP_START, 1, 0);
+  CHECK_NEAR(force(25, 0, 0), 1.0, 0.012);
+  ffb_fx_set_constant_cap(&E, 7.0f);                           /* a value that is not a fraction means: no limit */
+  CHECK_NEAR(E.gains.constant_cap, 1.0, 1e-6);
+}
+
 TEST(test_fx_damper_friction_inertia)
 {
   fresh();
@@ -572,7 +600,13 @@ TEST(test_pid_glue_create_handshake)
     ffb_pid_rx_isr(FFB_REPORT_OUTPUT, sc, sizeof(sc));
     ffb_pid_rx_isr(FFB_REPORT_OUTPUT, st, sizeof(st));
     ffb_pid_poll(10, true, NULL);
-    CHECK_NEAR(ffb_pid_force(20, 0, 0, &active), ((0.5f * FFB_GAIN_CONSTANT > 1.0f) ? 1.0f : 0.5f * FFB_GAIN_CONSTANT) * ((FFB_INVERT_GAME_DIRECTION != 0) ? -1.0f : 1.0f), 3e-3);   /* the profile's gain for constant forces */
+    {
+      const float cap = (FFB_CONSTANT_MAX_AMPS < FFB_MAX_AMPS) ? (FFB_CONSTANT_MAX_AMPS / FFB_MAX_AMPS) : 1.0f;
+      float want = 0.5f * FFB_GAIN_CONSTANT;
+      if (want > cap) want = cap;
+      if (want > 1.0f) want = 1.0f;
+      CHECK_NEAR(ffb_pid_force(20, 0, 0, &active), want * ((FFB_INVERT_GAME_DIRECTION != 0) ? -1.0f : 1.0f), 3e-3);
+    }   /* the profile's gain for constant forces */
     CHECK(active);
     CHECK(ffb_pid_actuators_enabled());
     CHECK(ffb_pid_stats()->accepted >= 4);
@@ -592,6 +626,7 @@ void run_ffb_pid_tests(void)
   RUN(test_fx_ramp);
   RUN(test_fx_spring_condition);
   RUN(test_fx_gains_per_kind);
+  RUN(test_fx_constant_cap_limits_the_impact_only);
   RUN(test_fx_constant_filter_smooths_steps);
   RUN(test_fx_direction_invert_leaves_conditions_alone);
   RUN(test_fx_damper_friction_inertia);

@@ -69,6 +69,7 @@ RANGES = [
     ("ffb", "slew_amps_per_s", float, 0.01, 1000.0),
     ("ffb", "vel_filter_hz", float, 0.0, 200.0),
     ("ffb", "constant_filter_hz", float, 0.0, 200.0),
+    ("ffb", "constant_max_amps", float, 0.0, 6.0),
     ("ffb", "stop_start_deg", float, 0.0, 3600.0),
     ("ffb", "stop_full_deg", float, 1.0, 3600.0),
     ("ffb", "stop_amps", float, 0.0, 6.0),
@@ -376,6 +377,7 @@ def gen_header(p):
     m("FFB_STOP_START_DEG", c_float(f("stop_start_deg")), "soft stop (while the game plays) starts here")
     m("FFB_STOP_FULL_DEG", c_float(f("stop_full_deg")), "soft stop reaches stop_amps here")
     m("FFB_STOP_AMPS", c_float(f("stop_amps")), "soft stop force at stop_full_deg")
+    m("FFB_CONSTANT_MAX_AMPS", c_float(f("constant_max_amps")), "the game constant force / ramp alone is limited to this (A): crashes, skids")
     m("FFB_CONSTANT_FILTER_HZ", c_float(f("constant_filter_hz")), "low-pass on the game constant force / ramp (0 = off)")
     m("FFB_VEL_FILTER_HZ", c_float(f("vel_filter_hz")), "low-pass on the wheel speed for damper/friction (0 = off)")
     m("FFB_INVERT_GAME_DIRECTION", "1" if f("invert_game_direction") else "0", "1 = mirror the direction of constant/ramp/periodic game effects")
