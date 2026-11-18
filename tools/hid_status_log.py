@@ -12,6 +12,7 @@ Options:
     --once          read the status once and exit
     --diag          'wheel NOT readable'? shows every interface and every attempt with its error
     --log FILE      log file (appended, default wheel_log.txt; '' = none)
+    --print-every S seconds between the lines on the screen (default 0.2, 0 = only changes)
     --interval S    seconds between reads (default 0.05)
 
 What it writes (only changes, so the file stays small):
@@ -114,6 +115,13 @@ class Monitor:
             self.peak_speed = 0.0
             self.last_summary = now
         return out
+
+    def compact(self, r, x=None):
+        """One short line for the screen: STATE prearm=.. fault=.. torque=.. vbus=.. angle=.. flags=.."""
+        deg = None if x is None else (x - 32768) / 32768.0 * self.half
+        return "%s prearm=%s fault=%s torque=%+.3f vbus=%.1f%s flags=%s" % (
+            r["state"], r["prearm_reason"], r["fault"], r["torque_cmd_amps"], r["vbus_v"],
+            "" if deg is None else " angle=%+.0f" % deg, ",".join(r["flags"]) or "-")
 
     def lost(self, now):
         if self.present is False:
@@ -287,9 +295,15 @@ def diagnose(hid_module, out=print):
 
 
 def run(hid_module, log_path, interval, once=False, out=print, sleep=time.sleep, clock=time.time, max_loops=None,
-        half_range_deg=DEFAULT_HALF_RANGE_DEG):
+        half_range_deg=DEFAULT_HALF_RANGE_DEG, print_every=0.2):
+    last_print = [None]
     mon = Monitor(half_range_deg=half_range_deg)
     log = open(log_path, "a", encoding="utf-8") if log_path else None
+
+    def screen(now, r, x):
+        if print_every and (last_print[0] is None or now - last_print[0] >= print_every):
+            last_print[0] = now
+            out(mon.compact(r, x))
 
     def emit(lines):
         for line in lines:
@@ -314,7 +328,17 @@ def run(hid_module, log_path, interval, once=False, out=print, sleep=time.sleep,
                     dev = found[0]
             if dev is not None:
                 try:
-                    emit(mon.feed(clock(), read_status(dev), read_x(dev)))
+                    now = clock()
+                    r = read_status(dev)
+                    x = read_x(dev)
+                    lines = mon.feed(now, r, x)
+                    if log:
+                        for line in lines:
+                            log.write(line + "\n")
+                        log.flush()
+                    for line in lines:                              # changes: the details go to the screen as well
+                        out(line)
+                    screen(now, r, x)
                 except (OSError, ValueError):
                     try:
                         dev.close()
@@ -342,6 +366,8 @@ def main(argv=None):
     ap.add_argument("--log", default="wheel_log.txt", help="log file (appended); '' = no file")
     ap.add_argument("--half-range-deg", type=float, default=DEFAULT_HALF_RANGE_DEG,
                     help="degrees from the centre to full X (lock-to-lock / 2; 450 for 900 deg)")
+    ap.add_argument("--print-every", type=float, default=0.2,
+                    help="seconds between the lines on the screen (0 = only the changes); the file always gets only the changes")
     ap.add_argument("--interval", type=float, default=0.05, help="seconds between reads (default 0.05)")
     a = ap.parse_args(argv)
     if sys.platform.startswith("linux"):
@@ -356,7 +382,8 @@ def main(argv=None):
         print("hidapi module: %s" % getattr(hid, "__file__", "?"))
         return diagnose(hid)
     print("Monitoring the wheel (VID %04X PID %04X). Ctrl+C stops. Log: %s" % (VID, PID, a.log or "(none)"))
-    return run(hid, a.log or None, a.interval, once=a.once, half_range_deg=a.half_range_deg)
+    return run(hid, a.log or None, a.interval, once=a.once, half_range_deg=a.half_range_deg,
+               print_every=a.print_every)
 
 
 if __name__ == "__main__":

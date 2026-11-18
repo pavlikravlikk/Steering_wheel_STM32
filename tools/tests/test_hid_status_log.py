@@ -102,6 +102,24 @@ class TestRun(unittest.TestCase):
         self.assertIn("*** FAULT = OVERSPEED ***", text)
         self.assertIn("wheel NOT readable", text)
 
+    def test_screen_line_is_compact_and_has_fault_and_angle(self):
+        good = struct.pack("<BBBBBBhHHHH", 0x40, 1, 3, 0, 0, 0x11, 500, 200, 150, 0, 241)
+        d = FakeDevice([good, good, good, good])
+        d.read_latest_x = lambda: 32768 + 8192
+        out = []
+        t = [0.0]
+
+        def clock():
+            t[0] += 0.3
+            return t[0]
+
+        hid_status_log.run(FakeHid([d]), None, 0.0, out=out.append, sleep=lambda s: None, clock=clock, max_loops=3,
+                           print_every=0.2)
+        compact = [l for l in out if l.startswith("RUNNING prearm=OK fault=NONE")]
+        self.assertEqual(len(compact), 3)
+        self.assertIn("torque=+0.500", compact[0])
+        self.assertIn("angle=+112", compact[0].replace("+113", "+112"))
+
     def test_finds_the_length_windows_wants(self):
         good = struct.pack("<BBBBBBhHHHH", 0x40, 1, 3, 0, 0, 0x11, 500, 200, 150, 0, 241)
         d = FakeDevice([good, good])
