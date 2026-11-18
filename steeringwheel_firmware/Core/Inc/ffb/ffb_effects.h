@@ -62,6 +62,10 @@ typedef struct
   float constant;        /* constant, ramp (cornering, impacts)                  */
   float condition;       /* spring, damper, inertia, friction                    */
   float periodic_cap;    /* the periodic part alone is limited to +-this (normalised, 0..1) */
+  float texture_hz;         /* above this frequency the constant force is texture (gravel carried by the constant force); 0 = off */
+  float texture_gain;
+  float texture_deadband;   /* normalised */
+  float texture_cap;        /* normalised, the texture part alone is limited to +-this */
   float constant_deadband;  /* the constant / ramp part below +-this is ignored, above it the rest is rescaled (normalised, 0..1) */
   float constant_cap;       /* the constant / ramp part alone is limited to +-this (normalised, 0..1): crashes, skids */
   float constant_filter_hz; /* low-pass on the constant / ramp part (0 = off): the game changes that force in steps */
@@ -79,6 +83,8 @@ typedef struct
   uint8_t  bl_index;
   uint8_t  bl_status;        /* FFB_BL_*                                   */
   float    constant_filt;     /* filtered constant / ramp sum                */
+  float    constant_filt2;    /* texture split, first low-pass               */
+  float    constant_filt3;    /* texture split, second low-pass (2nd order high-pass) */
   bool     have_constant_filt;
   /* inertia needs acceleration */
   float    last_vel;
@@ -109,6 +115,12 @@ void ffb_fx_set_constant_cap(ffb_fx_engine_t *e, float cap);
  *  tyre noise) all the time: on a straight road they were felt as a constant jerking. A force below the band is dropped; above it
  *  the rest is rescaled so that a full-scale force is still full scale (no step at the edge of the band). */
 void ffb_fx_set_constant_deadband(ffb_fx_engine_t *e, float db);
+
+/** Many games carry the texture of the road (gravel, kerbs) as a fast wobble of the CONSTANT force. The slow part (low-pass
+ *  ffb_fx_set_constant_filter, dead band, cap) is the push of the car; the part above @p hz is the texture: it gets its own
+ *  dead band, gain and cap (all normalised to the full scale except the gain). The band between the two corner frequencies
+ *  (the restless corrections that jerked the wheel on a straight road) stays removed. hz or gain <= 0 = off. */
+void ffb_fx_set_constant_texture(ffb_fx_engine_t *e, float hz, float gain, float deadband, float cap);
 
 /** PID Device Reset: stop and free everything, defaults back. */
 void ffb_fx_reset(ffb_fx_engine_t *e);

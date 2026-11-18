@@ -472,6 +472,46 @@ TEST(test_fx_constant_deadband)
   CHECK_NEAR(E.gains.constant_deadband, 0.0, 1e-6);
 }
 
+/* Gravel that the game carries as a fast wobble of the constant force: the slow part is the push of the car, the part above the
+ * texture frequency is boosted, the mid band (the restless corrections) stays down. */
+static float wobble_peak(float hz, float amp_mag, int texture_on)
+{
+  float peak = 0.0f;
+  fresh();
+  ffb_fx_set_constant_filter(&E, 4.0f);
+  if (texture_on) ffb_fx_set_constant_texture(&E, 20.0f, 3.0f, 0.0f, 1.0f);
+  create(FFB_ET_CONSTANT);
+  set_effect(1, FFB_ET_CONSTANT, FFB_TIME_INFINITE, 0, 255, 9000);
+  set_constant(1, 0);
+  op(1, FFB_OP_START, 1, 0);
+  for (uint32_t t = 0; t < 1500; t++)
+  {
+    const float ph = 6.2831853f * hz * (float)t / 1000.0f;
+    const int16_t v = (int16_t)(amp_mag * ffb_sin_turns(ph / 6.2831853f));
+    float f;
+    set_constant(1, v);
+    f = force(t + 1, 0, 0);
+    if ((t > 1000) && (fabsf(f) > peak)) peak = fabsf(f);
+  }
+  return peak;
+}
+
+TEST(test_fx_constant_texture_split)
+{
+  const float amp = 1000.0f;                       /* 0.1 of the full scale */
+  const float raw = 0.1f;
+  /* without the texture path (the 4 Hz low-pass alone) gravel at 40 Hz is gone */
+  CHECK(wobble_peak(40.0f, amp, 0) < 0.1f * raw);
+  /* with it, a 40 Hz wobble comes back, boosted (gain 3, second-order high-pass 0.8) */
+  CHECK(wobble_peak(40.0f, amp, 1) > 1.8f * raw);
+  CHECK(wobble_peak(40.0f, amp, 1) < 3.2f * raw);
+  /* the mid band stays DOWN: at 8 Hz less than the original (the corrections that jerked the wheel) */
+  CHECK(wobble_peak(8.0f, amp, 1) < 0.8f * raw);
+  /* the slow push of the car (1 Hz) goes through the slow path unchanged */
+  CHECK(wobble_peak(1.0f, amp, 1) > 0.9f * raw);
+  CHECK(wobble_peak(1.0f, amp, 1) < 1.1f * raw);
+}
+
 TEST(test_fx_damper_friction_inertia)
 {
   fresh();
@@ -649,6 +689,7 @@ void run_ffb_pid_tests(void)
   RUN(test_fx_ramp);
   RUN(test_fx_spring_condition);
   RUN(test_fx_gains_per_kind);
+  RUN(test_fx_constant_texture_split);
   RUN(test_fx_constant_deadband);
   RUN(test_fx_constant_cap_limits_the_impact_only);
   RUN(test_fx_constant_filter_smooths_steps);

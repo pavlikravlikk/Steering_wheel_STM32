@@ -74,6 +74,18 @@
 #ifndef FFB_STOP_AMPS
 #define FFB_STOP_AMPS                 5.0f   /* soft stop force at stop_full_deg */
 #endif
+#ifndef FFB_CONSTANT_TEXTURE_HZ
+#define FFB_CONSTANT_TEXTURE_HZ       20.0f   /* above this the game's constant force is texture (gravel); 0 = off */
+#endif
+#ifndef FFB_CONSTANT_TEXTURE_GAIN
+#define FFB_CONSTANT_TEXTURE_GAIN     3.0f
+#endif
+#ifndef FFB_CONSTANT_TEXTURE_DEADBAND_AMPS
+#define FFB_CONSTANT_TEXTURE_DEADBAND_AMPS 0.08f
+#endif
+#ifndef FFB_CONSTANT_TEXTURE_MAX_AMPS
+#define FFB_CONSTANT_TEXTURE_MAX_AMPS 1.0f   /* the texture carried by the constant force alone is limited to this (A) */
+#endif
 #ifndef FFB_CONSTANT_DEADBAND_AMPS
 #define FFB_CONSTANT_DEADBAND_AMPS    0.4f   /* game constant force below this is ignored (A), the rest is rescaled */
 #endif

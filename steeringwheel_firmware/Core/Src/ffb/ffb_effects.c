@@ -66,6 +66,10 @@ void ffb_fx_init(ffb_fx_engine_t *e)
   e->gains.direction_sign = 1.0f;
   e->gains.constant_cap = 1.0f;
   e->gains.constant_deadband = 0.0f;
+  e->gains.texture_hz = 0.0f;
+  e->gains.texture_gain = 0.0f;
+  e->gains.texture_deadband = 0.0f;
+  e->gains.texture_cap = 1.0f;
   ffb_fx_reset(e);
 }
 
@@ -75,6 +79,15 @@ void ffb_fx_set_gains(ffb_fx_engine_t *e, float periodic, float constant, float 
   e->gains.constant = (finite_f(constant) && (constant >= 0.0f)) ? constant : 1.0f;
   e->gains.condition = (finite_f(condition) && (condition >= 0.0f)) ? condition : 1.0f;
   e->gains.periodic_cap = (finite_f(periodic_cap) && (periodic_cap > 0.0f) && (periodic_cap < 1.0f)) ? periodic_cap : 1.0f;
+}
+
+void ffb_fx_set_constant_texture(ffb_fx_engine_t *e, float hz, float gain, float deadband, float cap)
+{
+  const bool ok = finite_f(hz) && (hz > 0.0f) && finite_f(gain) && (gain > 0.0f);
+  e->gains.texture_hz = ok ? hz : 0.0f;
+  e->gains.texture_gain = ok ? gain : 0.0f;
+  e->gains.texture_deadband = (finite_f(deadband) && (deadband > 0.0f) && (deadband < 1.0f)) ? deadband : 0.0f;
+  e->gains.texture_cap = (finite_f(cap) && (cap > 0.0f) && (cap < 1.0f)) ? cap : 1.0f;
 }
 
 void ffb_fx_set_constant_deadband(ffb_fx_engine_t *e, float db)
@@ -121,6 +134,8 @@ void ffb_fx_reset(ffb_fx_engine_t *e)
   e->bl_status = FFB_BL_PENDING;
   e->have_vel = false;
   e->constant_filt = 0.0f;
+  e->constant_filt2 = 0.0f;
+  e->constant_filt3 = 0.0f;
   e->have_constant_filt = false;
 }
 
@@ -459,26 +474,49 @@ float ffb_fx_force(ffb_fx_engine_t *e, uint32_t now_ms, float pos, float vel, bo
     *active = false;
     return 0.0f;
   }
-  if (e->gains.constant_filter_hz > 0.0f)
   {
-    /* the game changes its constant force in steps (about 60 times a second): a wheel that is pushed by those steps jerks.
-     * A first-order low-pass turns each step into a short ramp; gravel (periodic) and the conditions are not filtered. */
-    const float dt = dt_s;
-    const float rc = 1.0f / (6.2831853f * e->gains.constant_filter_hz);
-    const float alpha = dt / (dt + rc);
-    e->constant_filt = e->have_constant_filt ? (e->constant_filt + (alpha * (csum - e->constant_filt))) : csum;
-    e->have_constant_filt = true;
-    csum = e->constant_filt;
-  }
-  if (e->gains.constant_deadband > 0.0f)
-  {
-    const float db = e->gains.constant_deadband;
-    const float a = absf(csum);
-    csum = (a <= db) ? 0.0f : (((csum > 0.0f) ? 1.0f : -1.0f) * ((a - db) / (1.0f - db)));
-  }
-  if (e->gains.constant_cap < 1.0f)
-  {
-    csum = clampf(csum, -e->gains.constant_cap, e->gains.constant_cap);   /* an impact is a jolt, not a throw */
+    const float raw = csum;                /* the constant / ramp sum as the game sends it */
+    float tex = 0.0f;
+    if (e->gains.constant_filter_hz > 0.0f)
+    {
+      /* The game changes its constant force in steps (about 60 times a second): a wheel pushed by those steps jerks.
+       * A first-order low-pass turns each step into a short ramp. */
+      const float rc = 1.0f / (6.2831853f * e->gains.constant_filter_hz);
+      const float alpha = dt_s / (dt_s + rc);
+      e->constant_filt = e->have_constant_filt ? (e->constant_filt + (alpha * (raw - e->constant_filt))) : raw;
+      if (e->gains.texture_hz > 0.0f)
+      {
+        /* What is ABOVE texture_hz is the texture of the road (gravel, kerbs). A second-order high-pass (two first-order ones in
+         * a row): one of them still lets the mid band through with a gain (at 8 Hz the texture gain would have made it LOUDER
+         * than the original), two keep the 4..15 Hz corrections down and lift only the fast buzz. */
+        const float rc2 = 1.0f / (6.2831853f * e->gains.texture_hz);
+        const float alpha2 = dt_s / (dt_s + rc2);
+        float hp1;
+        e->constant_filt2 = e->have_constant_filt ? (e->constant_filt2 + (alpha2 * (raw - e->constant_filt2))) : raw;
+        hp1 = raw - e->constant_filt2;
+        e->constant_filt3 = e->have_constant_filt ? (e->constant_filt3 + (alpha2 * (hp1 - e->constant_filt3))) : hp1;
+        tex = hp1 - e->constant_filt3;
+      }
+      e->have_constant_filt = true;
+      csum = e->constant_filt;
+    }
+    if (e->gains.constant_deadband > 0.0f)
+    {
+      const float db = e->gains.constant_deadband;
+      const float a = absf(csum);
+      csum = (a <= db) ? 0.0f : (((csum > 0.0f) ? 1.0f : -1.0f) * ((a - db) / (1.0f - db)));
+    }
+    if (e->gains.constant_cap < 1.0f)
+    {
+      csum = clampf(csum, -e->gains.constant_cap, e->gains.constant_cap);   /* an impact is a jolt, not a throw */
+    }
+    if (e->gains.texture_gain > 0.0f)
+    {
+      const float db = e->gains.texture_deadband;
+      const float a = absf(tex);
+      tex = (a <= db) ? 0.0f : (((tex > 0.0f) ? 1.0f : -1.0f) * (a - db));
+      csum += clampf(tex * e->gains.texture_gain, -e->gains.texture_cap, e->gains.texture_cap);
+    }
   }
   psum = clampf(psum, -e->gains.periodic_cap, e->gains.periodic_cap);
   sum = (psum + csum + ksum) * ((float)e->device_gain / 255.0f);

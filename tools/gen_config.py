@@ -71,6 +71,10 @@ RANGES = [
     ("ffb", "constant_filter_hz", float, 0.0, 200.0),
     ("ffb", "constant_max_amps", float, 0.0, 6.0),
     ("ffb", "constant_deadband_amps", float, 0.0, 3.0),
+    ("ffb", "constant_texture_hz", float, 0.0, 200.0),
+    ("ffb", "constant_texture_gain", float, 0.0, 20.0),
+    ("ffb", "constant_texture_deadband_amps", float, 0.0, 2.0),
+    ("ffb", "constant_texture_max_amps", float, 0.0, 6.0),
     ("ffb", "stop_start_deg", float, 0.0, 3600.0),
     ("ffb", "stop_full_deg", float, 1.0, 3600.0),
     ("ffb", "stop_amps", float, 0.0, 6.0),
@@ -378,6 +382,10 @@ def gen_header(p):
     m("FFB_STOP_START_DEG", c_float(f("stop_start_deg")), "soft stop (while the game plays) starts here")
     m("FFB_STOP_FULL_DEG", c_float(f("stop_full_deg")), "soft stop reaches stop_amps here")
     m("FFB_STOP_AMPS", c_float(f("stop_amps")), "soft stop force at stop_full_deg")
+    m("FFB_CONSTANT_TEXTURE_HZ", c_float(f("constant_texture_hz")), "above this the game's constant force is texture (gravel); 0 = off")
+    m("FFB_CONSTANT_TEXTURE_GAIN", c_float(f("constant_texture_gain")))
+    m("FFB_CONSTANT_TEXTURE_DEADBAND_AMPS", c_float(f("constant_texture_deadband_amps")))
+    m("FFB_CONSTANT_TEXTURE_MAX_AMPS", c_float(f("constant_texture_max_amps")), "the texture carried by the constant force alone is limited to this (A)")
     m("FFB_CONSTANT_DEADBAND_AMPS", c_float(f("constant_deadband_amps")), "game constant force below this is ignored (A), the rest is rescaled")
     m("FFB_CONSTANT_MAX_AMPS", c_float(f("constant_max_amps")), "the game constant force / ramp alone is limited to this (A): crashes, skids")
     m("FFB_CONSTANT_FILTER_HZ", c_float(f("constant_filter_hz")), "low-pass on the game constant force / ramp (0 = off)")
