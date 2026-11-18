@@ -57,7 +57,7 @@
 
 /* --- FFB limits (used only with -DWHEEL_FFB=ON) ----------------------- */
 #ifndef FFB_PROFILE_MAX_AMPS
-#define FFB_PROFILE_MAX_AMPS          4.0f
+#define FFB_PROFILE_MAX_AMPS          5.0f
 #endif
 #ifndef FFB_SLEW_AMPS_PER_S
 #define FFB_SLEW_AMPS_PER_S           100.0f
@@ -77,6 +77,12 @@
 #ifndef FFB_PERIODIC_MAX_AMPS
 #define FFB_PERIODIC_MAX_AMPS         1.5f   /* the periodic part alone is limited to this (A) */
 #endif
+#ifndef FFB_REGEN_POWER_LIMIT_W
+#define FFB_REGEN_POWER_LIMIT_W       20.0f   /* W the motor may take out of the wheel (braking power limit, 0 = off) */
+#endif
+#ifndef FFB_TORQUE_CONSTANT_NOMINAL
+#define FFB_TORQUE_CONSTANT_NOMINAL   0.5f   /* Nm/A, only for the regeneration power estimate */
+#endif
 #ifndef FFB_SPRING_KP
 #define FFB_SPRING_KP                 3.0f   /* A per wheel turn */
 #endif
@@ -93,7 +99,7 @@
 #define FFB_ENDSTOP_WIDTH_DEG         60.0f
 #endif
 #ifndef FFB_ENDSTOP_AMPS
-#define FFB_ENDSTOP_AMPS              4.0f
+#define FFB_ENDSTOP_AMPS              5.0f
 #endif
 #ifndef FFB_ENDSTOP_DAMPING
 #define FFB_ENDSTOP_DAMPING           0.3f

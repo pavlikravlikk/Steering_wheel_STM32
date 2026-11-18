@@ -72,6 +72,7 @@ RANGES = [
     ("ffb", "gain_constant", float, 0.0, 10.0),
     ("ffb", "gain_condition", float, 0.0, 10.0),
     ("ffb", "periodic_max_amps", float, 0.0, 6.0),
+    ("ffb", "regen_power_limit_w", float, 0.0, 200.0),
     ("ffb", "spring_kp_amps_per_turn", float, 0.0, 20.0),
     ("ffb", "damper_amps_per_turn_s", float, 0.0, 20.0),
     ("ffb", "friction_amps", float, 0.0, 1.0),
@@ -356,6 +357,8 @@ def gen_header(p):
     m("FFB_GAIN_CONSTANT", c_float(f("gain_constant")), "game constant force / ramp x gain")
     m("FFB_GAIN_CONDITION", c_float(f("gain_condition")), "game spring/damper/friction/inertia x gain (keep low: closed loop)")
     m("FFB_PERIODIC_MAX_AMPS", c_float(f("periodic_max_amps")), "the periodic part alone is limited to this (A)")
+    m("FFB_REGEN_POWER_LIMIT_W", c_float(f("regen_power_limit_w")), "W the motor may take out of the wheel (braking power limit, 0 = off)")
+    m("FFB_TORQUE_CONSTANT_NOMINAL", c_float(o("torque_constant")), "Nm/A, only for the regeneration power estimate")
     m("FFB_SPRING_KP", c_float(f("spring_kp_amps_per_turn")), "A per wheel turn")
     m("FFB_DAMPER_KD", c_float(f("damper_amps_per_turn_s")), "A per wheel turn/s")
     m("FFB_FRICTION_AMPS", c_float(f("friction_amps")))

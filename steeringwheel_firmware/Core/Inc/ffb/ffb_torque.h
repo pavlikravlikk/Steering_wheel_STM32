@@ -30,6 +30,8 @@ typedef struct
   float endstop_damping;      /* A per wheel turn/s inside the wall        */
   float max_amps;             /* total clamp (<= FFB_HARD_CAP_AMPS)        */
   float slew_amps_per_s;
+  float regen_power_w;        /* mechanical power the motor may take OUT of the wheel (0 = no limit)  */
+  float kt_nominal;           /* Nm per A (profile), only for that power estimate                     */
 } ffb_torque_cfg_t;
 
 typedef struct
@@ -62,6 +64,12 @@ float ffb_layer_a(const ffb_torque_cfg_t *cfg, ffb_torque_state_t *st, const ffb
                   float dt_s, bool spring_enabled);
 
 float ffb_clamp(float v, float limit);
+
+/** Regeneration power limiter. When the commanded current opposes the wheel's motion the motor brakes the wheel and the energy
+ *  goes into the supply (it cannot take it: the voltage rises, 24 -> 28 V on 2026-11-18). The braking power is
+ *  kt * |amps| * 2*pi*|speed|; this limits |amps| so that it stays at or below @p power_w. A force that pushes WITH the motion,
+ *  or a slow wheel, is not limited. power_w <= 0 or kt <= 0 disables it. */
+float ffb_regen_limit(float amps, float vel_turns_s, float kt, float power_w);
 
 /** Scale (0..1) that fades the commanded current out while the supply voltage rises (regeneration: the wheel is forced
  *  against the motor and the energy goes into the bus). 1 below @p start_v, 0 at and above @p end_v, linear between.

@@ -31,6 +31,8 @@ void ffb_torque_default_cfg(ffb_torque_cfg_t *cfg)
   cfg->endstop_damping = FFB_ENDSTOP_DAMPING;
   cfg->max_amps = FFB_MAX_AMPS;
   cfg->slew_amps_per_s = FFB_SLEW_AMPS_PER_S;
+  cfg->regen_power_w = FFB_REGEN_POWER_LIMIT_W;
+  cfg->kt_nominal = FFB_TORQUE_CONSTANT_NOMINAL;
 }
 
 void ffb_torque_reset(ffb_torque_state_t *st)
@@ -47,6 +49,24 @@ float ffb_clamp(float v, float limit)
     return 0.0f;
   }
   return (v > limit) ? limit : ((v < -limit) ? -limit : v);
+}
+
+float ffb_regen_limit(float amps, float vel_turns_s, float kt, float power_w)
+{
+  float per_amp_w;
+  float allowed;
+
+  if (!(power_w > 0.0f) || !(kt > 0.0f) || !finite_f(amps) || !finite_f(vel_turns_s))
+  {
+    return amps;                       /* disabled (a non-finite input is caught by the caller) */
+  }
+  if ((amps * vel_turns_s) >= 0.0f)
+  {
+    return amps;                       /* pushing with the motion, or standing still: no regeneration */
+  }
+  per_amp_w = kt * 6.2831853f * absf(vel_turns_s);   /* W of braking power per ampere */
+  allowed = power_w / per_amp_w;
+  return ffb_clamp(amps, allowed);
 }
 
 float ffb_vbus_derate(float vbus, float start_v, float end_v)
@@ -190,6 +210,7 @@ bool ffb_torque_step(const ffb_torque_cfg_t *cfg, ffb_torque_state_t *st, const 
   limit = (cfg->max_amps < FFB_HARD_CAP_AMPS) ? cfg->max_amps : FFB_HARD_CAP_AMPS;
   target = ffb_layer_a(cfg, st, ax, dt_s, spring_enabled) + host_amps;
   target = ffb_clamp(target, limit);
+  target = ffb_regen_limit(target, ax->vel_turns_s, cfg->kt_nominal, cfg->regen_power_w);
   target = ffb_slew(st->last_amps, target, cfg->slew_amps_per_s, dt_s);
   target = ffb_clamp(target, limit);
   st->last_amps = target;

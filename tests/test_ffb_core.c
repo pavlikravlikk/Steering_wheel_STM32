@@ -690,6 +690,42 @@ TEST(test_torque_clamp_and_hard_cap)
   CHECK_NEAR(ffb_clamp(0.5f, NAN), 0.0, 0);
 }
 
+TEST(test_regen_limit)
+{
+  const float kt = 0.5f, w = 20.0f;
+  /* braking power = kt * A * 2 pi * turns/s: at 2 turns/s one ampere brakes with 6.28 W, so 20 W allows 3.18 A */
+  CHECK_NEAR(ffb_regen_limit(-5.0f, 2.0f, kt, w), -20.0 / (0.5 * 6.2831853 * 2.0), 1e-3);
+  CHECK_NEAR(ffb_regen_limit(5.0f, -2.0f, kt, w), 20.0 / (0.5 * 6.2831853 * 2.0), 1e-3);
+  CHECK_NEAR(ffb_regen_limit(-5.0f, 0.2f, kt, w), -5.0, 1e-6);        /* slow: 3 W, not limited */
+  CHECK_NEAR(ffb_regen_limit(5.0f, 2.0f, kt, w), 5.0, 1e-6);          /* pushes WITH the motion: motoring */
+  CHECK_NEAR(ffb_regen_limit(-5.0f, 0.0f, kt, w), -5.0, 1e-6);        /* standing still: a held wall keeps its force */
+  CHECK_NEAR(ffb_regen_limit(-5.0f, 3.0f, kt, 0.0f), -5.0, 1e-6);     /* off */
+  CHECK_NEAR(ffb_regen_limit(-5.0f, 3.0f, 0.0f, w), -5.0, 1e-6);
+  for (float v = 0.1f; v < 6.0f; v += 0.1f)                           /* the limit never grows with the speed */
+  {
+    CHECK(fabsf(ffb_regen_limit(-6.0f, v + 0.1f, kt, w)) <= fabsf(ffb_regen_limit(-6.0f, v, kt, w)) + 1e-5f);
+  }
+}
+
+TEST(test_regen_limit_in_the_torque_step)
+{
+  ffb_torque_cfg_t c = tcfg_plain();
+  ffb_torque_state_t st;
+  ffb_axis_t ax;
+  float a = 0.0f;
+  c.regen_power_w = 20.0f;
+  c.kt_nominal = 0.5f;
+  c.slew_amps_per_s = 1.0e6f;
+  c.spring_kp = 0.0f; c.damper_kd = 0.0f; c.friction_amps = 0.0f; c.inertia_k = 0.0f;
+  ffb_torque_reset(&st);
+  ax.angle_turns = 0.0f; ax.vel_turns_s = 3.0f;                       /* moving + */
+  CHECK(ffb_torque_step(&c, &st, &ax, -3.0f, false, 0.005f, &a));     /* a force of -3 A against it (brakes) */
+  CHECK_NEAR(a, -20.0 / (0.5 * 6.2831853 * 3.0), 1e-3);
+  ffb_torque_reset(&st);
+  CHECK(ffb_torque_step(&c, &st, &ax, 3.0f, false, 0.005f, &a));      /* the same force with the motion: untouched */
+  CHECK_NEAR(a, 3.0 < c.max_amps ? 3.0 : c.max_amps, 1e-6);
+}
+
 TEST(test_vbus_derate_curve)
 {
   CHECK_NEAR(ffb_vbus_derate(24.0f, 25.0f, 26.5f), 1.0, 1e-6);          /* below the start: full force */
@@ -1002,6 +1038,8 @@ void run_ffb_core_tests(void)
   RUN(test_torque_spring_damper_friction_signs);
   RUN(test_torque_endstop_shape);
   RUN(test_torque_clamp_and_hard_cap);
+  RUN(test_regen_limit);
+  RUN(test_regen_limit_in_the_torque_step);
   RUN(test_vbus_derate_curve);
   RUN(test_torque_slew_limiter);
   RUN(test_torque_invalid_inputs_fail_safe);
