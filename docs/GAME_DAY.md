@@ -1,11 +1,13 @@
 # Game day: BeamNG on the Windows laptop, hardware stays at the Linux laptop (variant A)
 
+**Numbers in this file (0.5 A, `vel_limit` 2) are from the day it was written; the current values are in `config/hardware_profile.toml` (2026-11-18: `max_amps` 1.0 A, `vel_limit` 4, `host_gain` 5).**
+
 Status when this was written (2026-11-17): everything up to F7 was done on Linux with the wheel DISMOUNTED (only the rotor housing,
 held by hand). Nothing in this file has been run yet. What is NOT verified: how the Windows HID PID driver treats our descriptor, the
 direction of game constant forces (convention PID / DirectInput, 90 deg = +X), the OVERSPEED fault on hardware.
 
 Safety rules for the whole session: the housing is held by the hand and the steering wheel stays dismounted; the force is capped at
-`ffb.max_amps` 0.5 A (about 0.25 Nm) by the firmware; hand next to the 24 V e-stop; **B1 pressed ONCE disarms** (never hold B1 for
+`ffb.max_amps` (profile; 0.5 A when this was written, 1.0 A = about 0.5 Nm now) by the firmware; hand next to the 24 V e-stop; **B1 pressed ONCE disarms** (never hold B1 for
 1 s or longer: that re-centres); mains terminals covered; fingers away from the gears.
 
 ## 1. Linux laptop: bring the rig to "ready" (every power-up)
@@ -21,7 +23,7 @@ ODrive; it has NOT been run on the real ODrive yet. Do the same after an STM32 r
    `odrv0.axis0.motor.config.current_lim = 6.0`, `odrv0.axis0.motor.config.calibration_current = 5.0`,
    `odrv0.axis0.requested_state = 7` (the housing turns about 180 deg and back, hands clear), wait ~10 s, then
    `current_state` 1, `error` 0, `encoder.error` 0, `encoder.is_ready` True. Close odrivetool (`Ctrl+D`, `y`).
-4. `~/odrive-env/bin/python tools/generated/odrive_setup.py --apply` (profile to RAM: 4 A, vel_limit 2, vel_gain 0.25, watchdog 0.25).
+4. `~/odrive-env/bin/python tools/generated/odrive_setup.py --apply` (profile to RAM: 4 A, `vel_limit`, `vel_gain` 0.25, watchdog 0.25; values from the profile).
 5. `~/odrive-env/bin/python tools/odrive_status.py --live` must end with `FFB precheck would PASS`.
    Keep the housing at the straight position: the centre is the position when the STM32 starts.
 
@@ -55,5 +57,5 @@ expected, section 1 repeats it next time. Nothing is saved on the ODrive (`--sav
 ## Known limits
 - No mechanical rotation stop yet: this is only for the dismounted housing. Mounting the steering wheel (F8) needs the hardware e-stop
   and a mechanical stop, see `docs/FFB_SAFETY.md` section 5.
-- The torque tapers to 0 as the speed approaches `vel_limit` (2 turns/s) because of the ODrive velocity limiter (`vel_gain`), so fast
+- The torque tapers to 0 as the speed approaches `vel_limit` (2 turns/s when written, 4 now) because of the ODrive velocity limiter (`vel_gain`, `vel_limit` now 4), so fast
   hand movements feel lighter.

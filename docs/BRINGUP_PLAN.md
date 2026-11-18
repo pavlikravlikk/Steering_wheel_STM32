@@ -1,4 +1,4 @@
-# Bring-up plan: what to do with what is on the table (2026-11-16)
+# Bring-up plan: what to do with what is on the table (2026-11-16; limits table updated 2026-11-18)
 
 Order and safety rules come from `docs/HARDWARE_BRINGUP.md` and `docs/FFB_SAFETY.md`; this page only sorts the steps by
 **what hardware is needed**. Stop at the first surprise.
@@ -28,8 +28,8 @@ Order and safety rules come from `docs/HARDWARE_BRINGUP.md` and `docs/FFB_SAFETY
 |---|---|---|
 | Bus voltage | trips below 18 V / above 30 V; FFB refuses/faults outside 20-28 V | profile (ODrive) + firmware precheck |
 | Supply current | PSU 13.4 A max; ODrive `dc_max_positive_current` 6 A; DC fuse 10-15 A recommended (not fitted) | profile + hardware |
-| Motor current | ODrive `current_lim` 4 A (firmware refuses to arm above the profile); FFB `max_amps` <= 1 A (code cap), 0.3 A for the first tests, slew 5 A/s | profile + firmware |
-| Speed | `vel_limit` 2 turns/s, ODrive overspeed error, firmware OVERSPEED at 3 turns/s | profile + firmware |
+| Motor current | ODrive `current_lim` 4 A (firmware refuses to arm above the profile); FFB `max_amps` <= 1 A (code cap; now 1.0 A, the first tests used 0.3 A), slew `ffb.slew_amps_per_s` (now 100 A/s) | profile + firmware |
+| Speed | `odrive.vel_limit` (now 4 turns/s), ODrive overspeed error, firmware OVERSPEED at `ffb.overspeed_turns_s` (now 5 turns/s); OVERSPEED never tested on hardware | profile + firmware |
 | STM32 hang / unplugged wire | ODrive watchdog 0.25 s; firmware FAULT | ODrive + firmware |
 | Regeneration | brake resistor 50 W / 2 ohm on AUX; the profile now limits `dc_max_negative_current` to -1.5 A (about 36 W), heat sink still needed | profile + hardware |
 | Rotation range | HID clamps at +-lock/2; arming refused when the wheel is outside the range (`WHEEL_OUT_OF_RANGE`); soft wall under FFB; **no mechanical stop yet** (needed before the wheel is mounted) | firmware + (missing) hardware |

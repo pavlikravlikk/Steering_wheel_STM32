@@ -56,7 +56,7 @@ Failure: `lsusb -d 0483:5752` empty -> USB cable on the wrong connector (ST-LINK
    Without it: `python3 tools/odrive_status.py --manual` prints the odrivetool commands; save
    the output and run `python3 tools/odrive_status.py --fixture <file> --prefix axis0`.
 3. A first real dump is already committed as `docs/odrive_dump.txt` (2026-11-16) and is the
-   reference for the real parameter names (`docs/DUMP_RECONCILIATION.md`). Save a fresh one
+   reference for the real parameter names (`docs/archive/DUMP_RECONCILIATION.md`). Save a fresh one
    (`--dump-out`) after every configuration change; the generated scripts skip names that do
    not exist on your build.
 4. The committed dump predates the owner's startup-flag change: it still shows both startup

@@ -173,7 +173,7 @@ One line per decision: **what** — why — how to change it.
 
 # Reconciliation with the real dump (2026-11-16, after `docs/hardware.md` + `docs/odrive_dump.txt` were added)
 
-Full table: `docs/DUMP_RECONCILIATION.md`. Decisions:
+Full table: `docs/archive/DUMP_RECONCILIATION.md`. Decisions:
 - **`docs/odrive_dump.txt` is the source of truth** for names, types and current saved values. The synthetic fixtures were
   deleted; Python and C tests now read the real file (`tools/tests/test_odrive_status.py`, `tests/test_ffb_dump.c`),
   plus truncated/corrupted copies. — owner's instruction — n/a.

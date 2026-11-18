@@ -1,8 +1,8 @@
 # Force feedback: safety case, limits and bring-up
 
-**Status: written and tested on the host only. Nothing in this document has been run on the
-real motor.** The FFB code has never commanded a real ODrive. Treat the first power-up with
-FFB as an experiment with a 4 kg rotor that has **no mechanical end stop**.
+**Status (2026-11-18): written and tested on the host; bench steps F1-F7 were run on the real motor with the wheel DISMOUNTED
+(2026-11-17, notes in `docs/HARDWARE_BRINGUP.md`). Not tested on hardware: the OVERSPEED fault. Not done: F8 (wheel mounted).**
+The 4 kg rotor still has **no mechanical end stop** and there is no hardware e-stop: read section 5 before every session.
 
 ## 1. What exists
 
@@ -77,8 +77,8 @@ If a check fails the wheel stays DISARMED and shows the reason (section 6).
 | Accidental motor command in the normal build | No write code compiled; binary scan; source scan; tests | `check_all.sh`, `test_safety.c` |
 | Firmware writes a wrong setting | Writes restricted to 3 command kinds by an allowlist | `ffb_cmd.c` |
 | Too much current | Total command clamped to `ffb.max_amps` (<= 1 A hard cap in code); the ODrive's own `current_lim` must be <= the profile or no arming | `ffb_torque.c`, precheck |
-| Sudden jumps | Slew-rate limit (`ffb.slew_amps_per_s`, 5 A/s); RUNNING starts from 0 A | `ffb_torque.c` |
-| Wheel spinning away (no end stop, 4 kg) | Soft end stops beyond +-lock/2 with damping; OVERSPEED fault at `ffb.overspeed_turns_s`; the ODrive's `vel_limit` (<= 2 turns/s) with `enable_current_mode_vel_limit` and `enable_overspeed_error` (names in this build) | `ffb_torque.c`, `ffb_safety.c`, ODrive |
+| Sudden jumps | Slew-rate limit (`ffb.slew_amps_per_s`, 100 A/s since 2026-11-17; 5 A/s at first); RUNNING starts from 0 A | `ffb_torque.c` |
+| Wheel spinning away (no end stop, 4 kg) | Soft end stops beyond +-lock/2 with damping; OVERSPEED fault at `ffb.overspeed_turns_s`; the ODrive's `vel_limit` (the profile value, 4 turns/s since 2026-11-17) with `enable_current_mode_vel_limit` and `enable_overspeed_error` (names in this build) | `ffb_torque.c`, `ffb_safety.c`, ODrive |
 | STM32 hangs or the UART is unplugged | ODrive **watchdog** (required by the precheck) stops the axis after `watchdog_timeout` without `u 0`; on the STM32 side UART_TIMEOUT / POSITION_STALE faults | ODrive, `ffb_safety.c` |
 | Position data stale or garbage | POSITION_STALE after `ffb.stale_ms` (50 ms); strict number parser | `ffb_safety.c`, `odrive_ascii.c` |
 | ODrive reports an error / leaves closed loop | Errors and `current_state` are re-read while running (every 3rd cycle); any change -> FAULT | `ffb_precheck.c` |
@@ -96,7 +96,7 @@ If a check fails the wheel stays DISARMED and shows the reason (section 6).
   before using FFB with the wheel mounted.**
 - **Rotation limit (no mechanical stop yet):** the HID axis clamps at +-lock/2, but the wheel itself can still turn
   endlessly. With FFB armed there is a soft wall beyond +-lock/2 (smoothstep over `endstop_width_deg`, plus damping
-  while moving outward), limited by `ffb.max_amps` (0.3 A in the first tests): a hand overpowers it; when DISARMED or
+  while moving outward), limited by `ffb.max_amps` (0.3 A in the first tests, 1.0 A now): a hand overpowers it; when DISARMED or
   FAULT there is no limit at all. The centre is the power-up position, so power up with the wheel straight. A real
   multi-turn mechanical stop is needed before the wheel is mounted (a single pin only gives about +-170 deg; for 900 deg
   use a lead-screw / spiral / cable stop, or reduce `lock_to_lock_deg` to about 300 and use a pin).
@@ -158,6 +158,8 @@ the cycle's writes are refused and counted; 3 in a row -> WATCHDOG_FEED_FAILED f
 Measured rate and the worst cycle time are in the status report.
 
 ## 8. Mandatory bring-up order (F-steps; after docs/HARDWARE_BRINGUP.md H0-H9)
+
+**Progress 2026-11-18:** F1-F5 and F7 done on the bench; F6 done except OVERSPEED (hand-spinning the rotor was judged unsafe); F8 open (needs the mechanical stop and the hardware e-stop). The values named in the steps below (0.3 A, 0.2 A/turn) are the FIRST-arm values; the current ones are in the profile.
 
 Keep a hand on the 24 V switch for every F-step. Stop at the first surprise.
 

@@ -24,11 +24,12 @@ CubeMX/CMake firmware, host tools (all Python standard library) and a visualizer
 | Z – brake | pedals (future) | declared, `HID_AXIS_Z_NEUTRAL` (0) |
 | Buttons 1–10 | MCP23017 I/O expander on I2C1 (0x20) | implemented (bits 0..9; bits 10..15 reserved, `0`) |
 
-> **Status / safety (2026-11-16):** the **default** firmware never commands the motor. The
+> **Status / safety (2026-11-18):** the **default** firmware never commands the motor. The
 > ODrive driver can only transmit `f <axis>` / `r <path>` (enforced by an allowlist, tests and a
 > scan of the binary). Force feedback exists only in a separate build
 > (`-DWHEEL_FFB=ON`), cannot arm unless additionally built with `-DWHEEL_FFB_ARM_ALLOWED=1`,
-> and has **never run on the real motor** - read `docs/FFB_SAFETY.md` first.
+> and has run on the real motor only on the bench with the wheel dismounted (no mechanical stop, no hardware e-stop yet):
+> read `docs/FFB_SAFETY.md` first. Current state and open items: `docs/STATUS.md`. All documents: `docs/README.md`.
 > Host tests: `make test` (C: `make -C tests`, Python: `tools/tests`).
 
 ### Host tools (`tools/`, Python 3.11+ standard library only, never need sudo)
@@ -40,6 +41,10 @@ CubeMX/CMake firmware, host tools (all Python standard library) and a visualizer
 | `hid_probe.py` | live view of the HID reports (`--selftest`, `--file`, `--status` for the FFB status report) |
 | `measure_counts.py` | hand measurement -> counts per turn, belt ratio, `cpr` |
 | `project_status.py` | `make status`: TBD list, blockers, TODO(TBD) markers, test results |
+| `session_start.py` | start of a session after an ODrive power-up or an STM32 restart: errors with names, calibration, profile to RAM, verdict |
+| `ff_play.py`, `ff_soak.py` | play one force effect / imitate a game session without a game (Linux) |
+| `wheel_status.html` | read-only WebHID monitor of the FFB status report (Chrome/Edge, for the Windows laptop) |
+| `odrive_dump.py` | parser of ODrive property dumps (IPython and flat formats), used by the status tool and the tests |
 | `check_all.sh`, `mutation_test.sh` | full host verification |
 | `99-steeringwheel.rules` | udev rule (hidraw + input) for VID 0483 / PID 5752 |
 
@@ -78,6 +83,9 @@ Endpoint polling interval: 1 ms (`CUSTOM_HID_FS_BINTERVAL = 1`).
   OS sees as the game controller.
 
 ### 1. Steering encoder – LPD3806-600BM (TIM3, hardware quadrature decoder)
+
+> **Fallback only.** In the real build the encoder is wired to the **ODrive**, not to the STM32, and X comes from the ODrive over
+> USART1 (`docs/hardware.md`). This section applies only to `-DSTEERING_SOURCE=ENCODER`.
 
 | Encoder wire | Board pin | Notes |
 | :--- | :--- | :--- |
