@@ -53,7 +53,7 @@ const FAULTS = {
   9: "LOOP_OVERRUN", 10: "READ_FAILED", 11: "INTERNAL"
 };
 const FLAGS = {0: "arm_allowed_build", 1: "precheck_ok", 2: "profile_measured", 3: "host_effects_playing",
-               4: "actuators_enabled", 5: "arm_gesture_active"};
+               4: "actuators_enabled", 5: "arm_gesture_active", 6: "vbus_derating"};
 
 // bytes: DataView or Uint8Array of the feature report 0x40, with or without the leading report ID byte (16 or 15 bytes)
 function decodeStatus(bytes) {

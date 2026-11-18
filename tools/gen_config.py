@@ -78,6 +78,8 @@ RANGES = [
     ("ffb", "overspeed_turns_s", float, 0.1, 20.0),
     ("ffb", "vbus_min_v", float, 8.0, 56.0),
     ("ffb", "vbus_max_v", float, 8.0, 56.0),
+    ("ffb", "vbus_derate_start_v", float, 0.0, 56.0),
+    ("ffb", "vbus_derate_end_v", float, 0.0, 56.0),
     ("ffb", "watchdog_timeout_min_s", float, 0.01, 5.0),
     ("ffb", "watchdog_timeout_max_s", float, 0.01, 5.0),
     ("ffb", "command_period_ms", int, 1, 100),
@@ -247,6 +249,8 @@ def validate(p, require_measured=False):
                       " or the FFB precheck will always refuse")
     if o("watchdog_timeout") * 1000.0 < 4 * f("command_period_ms"):
         errors.append("odrive.watchdog_timeout must be at least 4 command periods")
+    if f("vbus_derate_start_v") > 0 and not (f("vbus_min_v") < f("vbus_derate_start_v") < f("vbus_derate_end_v") < f("vbus_max_v")):
+        errors.append("need ffb.vbus_min_v < vbus_derate_start_v < vbus_derate_end_v < vbus_max_v (or vbus_derate_start_v = 0 to switch it off)")
     if f("stale_ms") < 3 * f("command_period_ms"):
         errors.append("ffb.stale_ms must be at least 3 command periods")
     if not o("enable_watchdog"):
@@ -352,6 +356,8 @@ def gen_header(p):
     m("FFB_OVERSPEED_TURNS_S", c_float(f("overspeed_turns_s")), "wheel turns/s")
     m("FFB_VBUS_MIN_V", c_float(f("vbus_min_v")))
     m("FFB_VBUS_MAX_V", c_float(f("vbus_max_v")))
+    m("FFB_VBUS_DERATE_START_V", c_float(f("vbus_derate_start_v")), "force fades out above this supply voltage (0 = off)")
+    m("FFB_VBUS_DERATE_END_V", c_float(f("vbus_derate_end_v")), "force is 0 at and above this voltage (must be below vbus_max_v)")
     m("FFB_WATCHDOG_TIMEOUT_MIN_S", c_float(f("watchdog_timeout_min_s")))
     m("FFB_WATCHDOG_TIMEOUT_MAX_S", c_float(f("watchdog_timeout_max_s")))
     m("FFB_COMMAND_PERIOD_MS", "%dU" % f("command_period_ms"))

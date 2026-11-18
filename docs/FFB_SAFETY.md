@@ -82,7 +82,7 @@ If a check fails the wheel stays DISARMED and shows the reason (section 6).
 | STM32 hangs or the UART is unplugged | ODrive **watchdog** (required by the precheck) stops the axis after `watchdog_timeout` without `u 0`; on the STM32 side UART_TIMEOUT / POSITION_STALE faults | ODrive, `ffb_safety.c` |
 | Position data stale or garbage | POSITION_STALE after `ffb.stale_ms` (50 ms); strict number parser | `ffb_safety.c`, `odrive_ascii.c` |
 | ODrive reports an error / leaves closed loop | Errors and `current_state` are re-read while running (every 3rd cycle); any change -> FAULT | `ffb_precheck.c` |
-| Supply voltage out of range | `vbus_voltage` monitored -> VBUS_RANGE fault; ODrive trips at the profile's over/under-voltage levels | precheck, ODrive |
+| Supply voltage out of range | `vbus_voltage` monitored -> VBUS_RANGE fault; ODrive trips at the profile's over/under-voltage levels. **Regeneration guard (2026-11-18):** while the supply rises (the wheel is forced against the motor, the energy goes into the bus) the force fades out linearly from `ffb.vbus_derate_start_v` to 0 at `vbus_derate_end_v`, before the fault | precheck, `ffb_torque.c` (`ffb_vbus_derate`), ODrive |
 | Main loop stalls | LOOP_OVERRUN fault if a cycle is late by > 25 ms | `ffb_safety.c` |
 | A game sends nonsense | Reports validated (ID, type, length, ranges); total game force limited to full scale and then to `ffb.max_amps`; disable-actuators / stop-all / reset / USB unplug or suspend -> no game force | `ffb_pid.c`, `ffb_effects.c` |
 | Fault recovery hides a problem | FAULT is latched until power cycle; it re-sends `input_torque 0` + IDLE every 500 ms | `ffb_safety.c` |

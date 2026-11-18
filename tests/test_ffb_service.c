@@ -509,6 +509,46 @@ TEST(test_svc_host_gain_scales_before_the_clamp)
   }
 }
 
+/* Regeneration guard: when the supply voltage rises the force fades out (before the VBUS_RANGE fault), and comes back. */
+TEST(test_svc_vbus_derate_fades_the_force)
+{
+  ffb_service_t s;
+  ffb_service_cfg_t c = cfg_armable();
+  uint8_t rep[FFB_STATUS_REPORT_LEN];
+  mock_ready();
+  T = 0;
+  c.vbus_derate_start_v = 25.0f;
+  c.vbus_derate_end_v = 26.5f;
+  ffb_service_init(&s, &c, &k_io, T);
+  to_running(&s);
+  M.host_on = true;
+  M.host = 1.0f;                                   /* the full-scale game force: the cap (FFB_MAX_AMPS) */
+  M.vbus = 24.0f;
+  run_ms(&s, 1000, false, 0);
+  CHECK_NEAR(fabsf(s.last_amps), FFB_MAX_AMPS, 1e-3);
+  CHECK_NEAR(s.derate_scale, 1.0, 1e-6);
+  M.vbus = 25.75f;                                 /* halfway into the band */
+  run_ms(&s, 1000, false, 0);
+  CHECK_NEAR(s.derate_scale, 0.5, 1e-3);
+  CHECK_NEAR(fabsf(s.last_amps), 0.5f * FFB_MAX_AMPS, 1e-3);
+  ffb_service_status_report(&s, rep);
+  CHECK((rep[5] & FFB_FLAG_VBUS_DERATING) != 0);
+  CHECK_EQ_INT(s.sm.state, FFB_STATE_RUNNING);     /* still running: no fault */
+  M.vbus = 26.6f;                                  /* above the end: no force, but still no fault (limit 28 V) */
+  run_ms(&s, 1000, false, 0);
+  CHECK_NEAR(fabsf(s.last_amps), 0.0, 1e-6);
+  CHECK_EQ_INT(s.sm.state, FFB_STATE_RUNNING);
+  M.vbus = 24.0f;                                  /* the voltage falls: the force comes back */
+  run_ms(&s, 1000, false, 0);
+  CHECK_NEAR(fabsf(s.last_amps), FFB_MAX_AMPS, 1e-3);
+  ffb_service_status_report(&s, rep);
+  CHECK((rep[5] & FFB_FLAG_VBUS_DERATING) == 0);
+  M.vbus = 28.5f;                                  /* the fault stays the last line */
+  run_ms(&s, 1000, false, 0);
+  CHECK_EQ_INT(s.sm.state, FFB_STATE_FAULT);
+  CHECK_EQ_INT(s.sm.fault, FFB_FAULT_VBUS_RANGE);
+}
+
 /* After a fault: urgent torque 0 then IDLE, and never again a feed or a
  * non-zero torque or closed-loop request. */
 static void check_stopped_after(int from)
@@ -692,6 +732,7 @@ void run_ffb_service_tests(void)
   RUN(test_svc_loop_time_ignores_a_micros_wrap);
   RUN(test_svc_host_force_direction_and_actuators);
   RUN(test_svc_host_gain_scales_before_the_clamp);
+  RUN(test_svc_vbus_derate_fades_the_force);
   RUN(test_svc_every_runtime_fault);
   RUN(test_svc_closed_loop_refused_gives_arming_timeout);
   RUN(test_svc_user_disarm_with_b1);

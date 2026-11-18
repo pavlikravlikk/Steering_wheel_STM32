@@ -111,6 +111,16 @@ class TestProfile(unittest.TestCase):
         errors, _ = gen_config.validate(p)
         self.assertTrue(any("calibration_current" in e for e in errors))
 
+    def test_vbus_derate_must_sit_inside_the_window(self):
+        p = load()
+        set_val(p, "ffb", "vbus_derate_end_v", 28.5)                # above vbus_max_v 28
+        errors, _ = gen_config.validate(p)
+        self.assertTrue(any("vbus_derate" in e for e in errors))
+        p = load()
+        set_val(p, "ffb", "vbus_derate_start_v", 0.0)               # 0 switches it off: allowed
+        errors, _ = gen_config.validate(p)
+        self.assertFalse(any("vbus_derate" in e for e in errors))
+
     def test_ffb_max_amps_above_hard_cap_is_error(self):
         p = load()
         set_val(p, "ffb", "max_amps", 6.5)

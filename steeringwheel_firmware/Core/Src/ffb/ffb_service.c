@@ -39,6 +39,8 @@ void ffb_service_default_cfg(ffb_service_cfg_t *cfg)
   cfg->stale_ms = FFB_STALE_MS;
   cfg->arm_hold_ms = FFB_ARM_HOLD_MS;
   cfg->arm_b1_only = (FFB_ARM_B1_ONLY != 0);
+  cfg->vbus_derate_start_v = FFB_VBUS_DERATE_START_V;
+  cfg->vbus_derate_end_v = FFB_VBUS_DERATE_END_V;
 }
 
 void ffb_service_init(ffb_service_t *s, const ffb_service_cfg_t *cfg, const ffb_io_t *io,
@@ -59,6 +61,7 @@ void ffb_service_init(ffb_service_t *s, const ffb_service_cfg_t *cfg, const ffb_
   ffb_b1seq_init(&s->b1seq, cfg->arm_hold_ms);
   s->bg_reason = FFB_REASON_NOT_CHECKED_YET;
   s->actuators_enabled = true;
+  s->derate_scale = 1.0f;
   s->last_cycle_ms = now_ms;
   s->rate_window_ms = now_ms;
 }
@@ -316,9 +319,18 @@ void ffb_service_cycle(ffb_service_t *s, uint32_t now_ms)
     {
       amps = NAN;                  /* invalid input -> TORQUE_INVALID fault */
     }
+    /* Regeneration guard: the supply voltage rises when the wheel is forced against the motor (bench 2026-11-17: 24 -> 28 V in
+     * 0.3 s at 6 A). Fade the force out before the VBUS_RANGE fault, so the wheel gets lighter instead of going limp. */
+    s->derate_scale = 1.0f;
+    if (s->pc.v[FFB_PC_VBUS].valid && finite_f(amps))
+    {
+      s->derate_scale = ffb_vbus_derate(s->pc.v[FFB_PC_VBUS].value, s->cfg.vbus_derate_start_v, s->cfg.vbus_derate_end_v);
+      amps *= s->derate_scale;
+    }
   }
   else
   {
+    s->derate_scale = 1.0f;
     ffb_torque_reset(&s->tst);     /* RUNNING always starts from 0 A */
     s->host_active = false;
   }
@@ -458,6 +470,7 @@ void ffb_service_status_report(const ffb_service_t *s, uint8_t out[FFB_STATUS_RE
   if (s->cfg.profile_safety_tbd == 0U)  flags |= FFB_FLAG_PROFILE_MEASURED;
   if (s->host_active)                   flags |= FFB_FLAG_HOST_EFFECTS;
   if (s->actuators_enabled)             flags |= FFB_FLAG_ACTUATORS_ENABLED;
+  if (s->derate_scale < 0.999f)         flags |= FFB_FLAG_VBUS_DERATING;
   if (ffb_gesture_active(&s->gesture) || ffb_b1seq_pending(&s->b1seq))  flags |= FFB_FLAG_GESTURE_ACTIVE;
   if (ma > 32767)  ma = 32767;
   if (ma < -32768) ma = -32768;

@@ -63,6 +63,11 @@ float ffb_layer_a(const ffb_torque_cfg_t *cfg, ffb_torque_state_t *st, const ffb
 
 float ffb_clamp(float v, float limit);
 
+/** Scale (0..1) that fades the commanded current out while the supply voltage rises (regeneration: the wheel is forced
+ *  against the motor and the energy goes into the bus). 1 below @p start_v, 0 at and above @p end_v, linear between.
+ *  start_v <= 0 disables it (always 1). A voltage that is not finite gives 0 (fail safe). */
+float ffb_vbus_derate(float vbus, float start_v, float end_v);
+
 /** Move from @p prev towards @p target by at most rate*dt. */
 float ffb_slew(float prev, float target, float rate_per_s, float dt_s);
 

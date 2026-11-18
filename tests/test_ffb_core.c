@@ -690,6 +690,22 @@ TEST(test_torque_clamp_and_hard_cap)
   CHECK_NEAR(ffb_clamp(0.5f, NAN), 0.0, 0);
 }
 
+TEST(test_vbus_derate_curve)
+{
+  CHECK_NEAR(ffb_vbus_derate(24.0f, 25.0f, 26.5f), 1.0, 1e-6);          /* below the start: full force */
+  CHECK_NEAR(ffb_vbus_derate(25.0f, 25.0f, 26.5f), 1.0, 1e-6);
+  CHECK_NEAR(ffb_vbus_derate(25.75f, 25.0f, 26.5f), 0.5, 1e-6);         /* halfway: half */
+  CHECK_NEAR(ffb_vbus_derate(26.5f, 25.0f, 26.5f), 0.0, 1e-6);          /* at the end: nothing */
+  CHECK_NEAR(ffb_vbus_derate(40.0f, 25.0f, 26.5f), 0.0, 1e-6);
+  CHECK_NEAR(ffb_vbus_derate(27.0f, 0.0f, 0.0f), 1.0, 1e-6);           /* start 0 = switched off */
+  CHECK_NEAR(ffb_vbus_derate(NAN, 25.0f, 26.5f), 0.0, 1e-6);           /* not finite: fail safe */
+  CHECK_NEAR(ffb_vbus_derate(25.5f, 26.0f, 25.0f), 0.0, 1e-6);         /* end <= start: fail safe */
+  for (float v = 20.0f; v < 30.0f; v += 0.1f)                         /* never rises with the voltage */
+  {
+    CHECK(ffb_vbus_derate(v + 0.1f, 25.0f, 26.5f) <= ffb_vbus_derate(v, 25.0f, 26.5f) + 1e-6f);
+  }
+}
+
 TEST(test_torque_slew_limiter)
 {
   ffb_torque_cfg_t c = tcfg_plain();
@@ -986,6 +1002,7 @@ void run_ffb_core_tests(void)
   RUN(test_torque_spring_damper_friction_signs);
   RUN(test_torque_endstop_shape);
   RUN(test_torque_clamp_and_hard_cap);
+  RUN(test_vbus_derate_curve);
   RUN(test_torque_slew_limiter);
   RUN(test_torque_invalid_inputs_fail_safe);
   RUN(test_torque_units_with_several_kt);

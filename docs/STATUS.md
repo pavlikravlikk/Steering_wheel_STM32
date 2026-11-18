@@ -14,11 +14,13 @@ Older, dated notes: `docs/archive/STATUS_HISTORY.md`.
 ### Current feel and limits (profile, owner decisions step by step)
 | value | now | note |
 |---|---|---|
-| `ffb.max_amps` | 6.0 A (about 3 Nm) | code ceiling `FFB_HARD_CAP_AMPS` (raised 1 -> 3 -> 6 A on 2026-11-18, owner decision); steps were 0.3, 0.5, 0.8, 1.0, 3.0, 6.0; needs `odrive.current_lim` 6 A. **Wheel must stay dismounted at this value** |
+| `ffb.max_amps` | 4.0 A (about 2 Nm) | code ceiling `FFB_HARD_CAP_AMPS` is 6 A (raised 1 -> 3 -> 6 on 2026-11-18); steps were 0.3, 0.5, 0.8, 1.0, 3.0, 6.0, then back to 4.0 after the supply rose 24 -> 28 V (regeneration) against the 6 A wall; needs `odrive.current_lim` 6 A. **Wheel must stay dismounted at this value** |
 | `ffb.host_gain` | 1.0 (off) | game force x gain, then clamped; 5.0 until 2026-11-18, removed after the wheel swung between the end stops |
 | `ffb.spring_kp_amps_per_turn` | 3.0 | the cap is reached at about 0.33 turn (120 deg) |
 | `ffb.damper_amps_per_turn_s` | 0.25 | |
 | `ffb.slew_amps_per_s` | 100 | |
+| `ffb.endstop_width_deg` / `endstop_amps` | 60 deg / 4 A | the wall builds up over 60 deg (was 10 deg / 6 A): softer, less regeneration |
+| `ffb.vbus_derate_start_v` / `_end_v` | 25.0 V / 26.5 V | regeneration guard: the force fades out linearly as the supply rises, instead of the VBUS_RANGE fault at 28 V (flag `vbus_derating` in the status report) |
 | `odrive.vel_limit` / `vel_gain` | 4 turns/s / 0.8 (0.25 up to 1 A, 0.4 at 3 A) | `vel_limit * vel_gain >= max_amps * torque_constant` is enforced by `gen_config.py` |
 | `ffb.overspeed_turns_s` | 5 | firmware backup of the ODrive overspeed error (a game crash tripped it at 2.4 turns/s with the old limit 2) |
 

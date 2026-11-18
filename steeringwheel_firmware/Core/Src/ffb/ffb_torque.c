@@ -49,6 +49,27 @@ float ffb_clamp(float v, float limit)
   return (v > limit) ? limit : ((v < -limit) ? -limit : v);
 }
 
+float ffb_vbus_derate(float vbus, float start_v, float end_v)
+{
+  if (!(start_v > 0.0f))
+  {
+    return 1.0f;                       /* disabled */
+  }
+  if (!finite_f(vbus) || !(end_v > start_v))
+  {
+    return 0.0f;
+  }
+  if (vbus <= start_v)
+  {
+    return 1.0f;
+  }
+  if (vbus >= end_v)
+  {
+    return 0.0f;
+  }
+  return (end_v - vbus) / (end_v - start_v);
+}
+
 float ffb_fx_spring(float kp, float angle_turns)
 {
   return -kp * angle_turns;

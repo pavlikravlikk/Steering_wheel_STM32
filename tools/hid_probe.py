@@ -46,7 +46,7 @@ FFB_FAULTS = {
     9: "LOOP_OVERRUN", 10: "READ_FAILED", 11: "INTERNAL",
 }
 FFB_FLAGS = {0: "arm_allowed_build", 1: "precheck_ok", 2: "profile_measured", 3: "host_effects_playing",
-             4: "actuators_enabled", 5: "arm_gesture_active"}
+             4: "actuators_enabled", 5: "arm_gesture_active", 6: "vbus_derating"}
 
 
 def decode_joystick(payload):

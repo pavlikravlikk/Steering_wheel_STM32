@@ -57,7 +57,7 @@
 
 /* --- FFB limits (used only with -DWHEEL_FFB=ON) ----------------------- */
 #ifndef FFB_PROFILE_MAX_AMPS
-#define FFB_PROFILE_MAX_AMPS          6.0f
+#define FFB_PROFILE_MAX_AMPS          4.0f
 #endif
 #ifndef FFB_SLEW_AMPS_PER_S
 #define FFB_SLEW_AMPS_PER_S           100.0f
@@ -78,10 +78,10 @@
 #define FFB_INERTIA_KI                0.0f   /* placeholder */
 #endif
 #ifndef FFB_ENDSTOP_WIDTH_DEG
-#define FFB_ENDSTOP_WIDTH_DEG         10.0f
+#define FFB_ENDSTOP_WIDTH_DEG         60.0f
 #endif
 #ifndef FFB_ENDSTOP_AMPS
-#define FFB_ENDSTOP_AMPS              6.0f
+#define FFB_ENDSTOP_AMPS              4.0f
 #endif
 #ifndef FFB_ENDSTOP_DAMPING
 #define FFB_ENDSTOP_DAMPING           0.3f
@@ -94,6 +94,12 @@
 #endif
 #ifndef FFB_VBUS_MAX_V
 #define FFB_VBUS_MAX_V                28.0f
+#endif
+#ifndef FFB_VBUS_DERATE_START_V
+#define FFB_VBUS_DERATE_START_V       25.0f   /* force fades out above this supply voltage (0 = off) */
+#endif
+#ifndef FFB_VBUS_DERATE_END_V
+#define FFB_VBUS_DERATE_END_V         26.5f   /* force is 0 at and above this voltage (must be below vbus_max_v) */
 #endif
 #ifndef FFB_WATCHDOG_TIMEOUT_MIN_S
 #define FFB_WATCHDOG_TIMEOUT_MIN_S    0.05f

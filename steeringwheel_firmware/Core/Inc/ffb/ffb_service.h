@@ -34,6 +34,7 @@
 #define FFB_FLAG_HOST_EFFECTS       0x08U
 #define FFB_FLAG_ACTUATORS_ENABLED  0x10U
 #define FFB_FLAG_GESTURE_ACTIVE     0x20U
+#define FFB_FLAG_VBUS_DERATING      0x40U   /* the force is being faded out because the supply voltage rises */
 
 typedef struct
 {
@@ -71,6 +72,8 @@ typedef struct
   uint32_t stale_ms;           /* FFB_STALE_MS                              */
   uint32_t arm_hold_ms;        /* FFB_ARM_HOLD_MS                           */
   bool     arm_b1_only;        /* FFB_ARM_B1_ONLY: tap, tap, hold B1 can arm */
+  float    vbus_derate_start_v; /* FFB_VBUS_DERATE_START_V: force fades out above this supply voltage (0 = off) */
+  float    vbus_derate_end_v;   /* FFB_VBUS_DERATE_END_V: force is 0 at and above this voltage */
 } ffb_service_cfg_t;
 
 typedef struct
@@ -84,6 +87,8 @@ typedef struct
   ffb_torque_state_t tst;
   ffb_gesture_t      gesture;
   ffb_b1seq_t        b1seq;            /* only used when cfg.arm_b1_only        */
+
+  float         derate_scale;       /* 1 = full force, < 1 = faded by the supply voltage */
 
   bool          arm_event;          /* latched by ffb_service_buttons()      */
   bool          disarm_event;
