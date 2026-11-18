@@ -15,7 +15,7 @@ Older, dated notes: `docs/archive/STATUS_HISTORY.md`.
 | value | now | note |
 |---|---|---|
 | `ffb.max_amps` | 6.0 A (about 3 Nm) | code ceiling `FFB_HARD_CAP_AMPS` (raised 1 -> 3 -> 6 A on 2026-11-18, owner decision); steps were 0.3, 0.5, 0.8, 1.0, 3.0, 6.0; needs `odrive.current_lim` 6 A. **Wheel must stay dismounted at this value** |
-| `ffb.host_gain` | 5.0 | game force x gain, then clamped |
+| `ffb.host_gain` | 1.0 (off) | game force x gain, then clamped; 5.0 until 2026-11-18, removed after the wheel swung between the end stops |
 | `ffb.spring_kp_amps_per_turn` | 3.0 | the cap is reached at about 0.33 turn (120 deg) |
 | `ffb.damper_amps_per_turn_s` | 0.25 | |
 | `ffb.slew_amps_per_s` | 100 | |
