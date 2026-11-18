@@ -690,6 +690,24 @@ TEST(test_torque_clamp_and_hard_cap)
   CHECK_NEAR(ffb_clamp(0.5f, NAN), 0.0, 0);
 }
 
+TEST(test_spring_curve)
+{
+  const float amps[FFB_SPRING_CURVE_N] = { 1.0f, 1.8f, 2.5f, 3.2f, 4.0f, 5.0f };
+  CHECK_NEAR(ffb_fx_spring_curve(amps, 0.0f), 0.0, 1e-6);                 /* centre */
+  CHECK_NEAR(ffb_fx_spring_curve(amps, 45.0f / 360.0f), -0.5, 1e-5);      /* half way to the first point */
+  CHECK_NEAR(ffb_fx_spring_curve(amps, 90.0f / 360.0f), -1.0, 1e-5);
+  CHECK_NEAR(ffb_fx_spring_curve(amps, 135.0f / 360.0f), -1.4, 1e-5);
+  CHECK_NEAR(ffb_fx_spring_curve(amps, 450.0f / 360.0f), -4.0, 1e-5);
+  CHECK_NEAR(ffb_fx_spring_curve(amps, 540.0f / 360.0f), -5.0, 1e-5);
+  CHECK_NEAR(ffb_fx_spring_curve(amps, 5.0f), -5.0, 1e-5);                /* held beyond the last point */
+  CHECK_NEAR(ffb_fx_spring_curve(amps, -135.0f / 360.0f), 1.4, 1e-5);     /* symmetric, restoring */
+  CHECK_NEAR(ffb_fx_spring_curve(amps, NAN), 0.0, 1e-6);
+  for (float a = 0.0f; a < 2.0f; a += 0.01f)                              /* never decreases with the angle */
+  {
+    CHECK(fabsf(ffb_fx_spring_curve(amps, a + 0.01f)) >= fabsf(ffb_fx_spring_curve(amps, a)) - 1e-5f);
+  }
+}
+
 TEST(test_regen_limit)
 {
   const float kt = 0.5f, w = 20.0f;
@@ -716,7 +734,7 @@ TEST(test_regen_limit_in_the_torque_step)
   c.regen_power_w = 20.0f;
   c.kt_nominal = 0.5f;
   c.slew_amps_per_s = 1.0e6f;
-  c.spring_kp = 0.0f; c.damper_kd = 0.0f; c.friction_amps = 0.0f; c.inertia_k = 0.0f;
+  c.spring_kp = 0.0f; c.spring_curve_on = false; c.damper_kd = 0.0f; c.friction_amps = 0.0f; c.inertia_k = 0.0f;
   ffb_torque_reset(&st);
   ax.angle_turns = 0.0f; ax.vel_turns_s = 3.0f;                       /* moving + */
   CHECK(ffb_torque_step(&c, &st, &ax, -3.0f, false, 0.005f, &a));     /* a force of -3 A against it (brakes) */
@@ -1038,6 +1056,7 @@ void run_ffb_core_tests(void)
   RUN(test_torque_spring_damper_friction_signs);
   RUN(test_torque_endstop_shape);
   RUN(test_torque_clamp_and_hard_cap);
+  RUN(test_spring_curve);
   RUN(test_regen_limit);
   RUN(test_regen_limit_in_the_torque_step);
   RUN(test_vbus_derate_curve);

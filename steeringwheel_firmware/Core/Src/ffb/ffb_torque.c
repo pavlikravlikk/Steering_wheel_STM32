@@ -21,6 +21,17 @@ static float absf(float v)
 void ffb_torque_default_cfg(ffb_torque_cfg_t *cfg)
 {
   cfg->spring_kp = FFB_SPRING_KP;
+  cfg->spring_curve[0] = FFB_SPRING_AMPS_90;
+  cfg->spring_curve[1] = FFB_SPRING_AMPS_180;
+  cfg->spring_curve[2] = FFB_SPRING_AMPS_270;
+  cfg->spring_curve[3] = FFB_SPRING_AMPS_360;
+  cfg->spring_curve[4] = FFB_SPRING_AMPS_450;
+  cfg->spring_curve[5] = FFB_SPRING_AMPS_540;
+  cfg->spring_curve_on = false;
+  for (unsigned i = 0U; i < FFB_SPRING_CURVE_N; i++)
+  {
+    cfg->spring_curve_on = cfg->spring_curve_on || (cfg->spring_curve[i] > 0.0f);   /* all zero: the straight line */
+  }
   cfg->damper_kd = FFB_DAMPER_KD;
   cfg->friction_amps = FFB_FRICTION_AMPS;
   cfg->friction_vel_eps = FFB_FRICTION_VEL_EPS;
@@ -90,6 +101,30 @@ float ffb_vbus_derate(float vbus, float start_v, float end_v)
   return (end_v - vbus) / (end_v - start_v);
 }
 
+float ffb_fx_spring_curve(const float amps[FFB_SPRING_CURVE_N], float angle_turns)
+{
+  const float a = absf(angle_turns) * 360.0f;                 /* degrees from the centre */
+  const float step = FFB_SPRING_CURVE_STEP_DEG;
+  float mag;
+
+  if (!finite_f(a))
+  {
+    return 0.0f;
+  }
+  if (a >= (step * (float)FFB_SPRING_CURVE_N))
+  {
+    mag = amps[FFB_SPRING_CURVE_N - 1U];
+  }
+  else
+  {
+    const unsigned i = (unsigned)(a / step);                  /* segment 0 starts at the centre (0 A) */
+    const float lo = (i == 0U) ? 0.0f : amps[i - 1U];
+    const float f = (a - ((float)i * step)) / step;
+    mag = lo + ((amps[i] - lo) * f);
+  }
+  return (angle_turns >= 0.0f) ? -mag : mag;
+}
+
 float ffb_fx_spring(float kp, float angle_turns)
 {
   return -kp * angle_turns;
@@ -146,7 +181,8 @@ float ffb_layer_a(const ffb_torque_cfg_t *cfg, ffb_torque_state_t *st, const ffb
 
   if (spring_enabled)
   {
-    sum += ffb_fx_spring(cfg->spring_kp, ax->angle_turns);
+    sum += cfg->spring_curve_on ? ffb_fx_spring_curve(cfg->spring_curve, ax->angle_turns)
+                                : ffb_fx_spring(cfg->spring_kp, ax->angle_turns);
   }
   sum += ffb_fx_damper(cfg->damper_kd, ax->vel_turns_s);
   sum += ffb_fx_friction(cfg->friction_amps, cfg->friction_vel_eps, ax->vel_turns_s);

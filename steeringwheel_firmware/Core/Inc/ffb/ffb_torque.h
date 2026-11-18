@@ -17,9 +17,15 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#define FFB_SPRING_CURVE_N 6U
+#define FFB_SPRING_CURVE_STEP_DEG 90.0f
+
 typedef struct
 {
-  float spring_kp;            /* A per wheel turn                          */
+  float spring_kp;            /* A per wheel turn (used only when spring_curve_on is false) */
+  bool  spring_curve_on;      /* centring force from the curve below instead of the straight line */
+  float spring_curve[FFB_SPRING_CURVE_N]; /* A at 90, 180, 270, 360, 450, 540 deg from the centre; linear in between,
+                                 from 0 at the centre, and held at the last value beyond */
   float damper_kd;            /* A per wheel turn/s                        */
   float friction_amps;        /* A                                         */
   float friction_vel_eps;     /* turns/s for full friction                 */
@@ -52,6 +58,9 @@ void ffb_torque_default_cfg(ffb_torque_cfg_t *cfg);
 void ffb_torque_reset(ffb_torque_state_t *st);
 
 float ffb_fx_spring(float kp, float angle_turns);
+/** Centring force from a curve: amps[i] at (i+1) * FFB_SPRING_CURVE_STEP_DEG degrees, linear in between and from 0 at the centre,
+ *  held at the last value beyond. Restoring (opposite sign to the angle), symmetric. */
+float ffb_fx_spring_curve(const float amps[FFB_SPRING_CURVE_N], float angle_turns);
 float ffb_fx_damper(float kd, float vel_turns_s);
 float ffb_fx_friction(float amps, float vel_eps, float vel_turns_s);
 /** Soft end stop: 0 inside +-half_range, then a smoothstep wall that reaches

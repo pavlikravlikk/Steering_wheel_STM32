@@ -74,6 +74,12 @@ RANGES = [
     ("ffb", "periodic_max_amps", float, 0.0, 6.0),
     ("ffb", "regen_power_limit_w", float, 0.0, 200.0),
     ("ffb", "spring_kp_amps_per_turn", float, 0.0, 20.0),
+    ("ffb", "spring_amps_90", float, 0.0, 6.0),
+    ("ffb", "spring_amps_180", float, 0.0, 6.0),
+    ("ffb", "spring_amps_270", float, 0.0, 6.0),
+    ("ffb", "spring_amps_360", float, 0.0, 6.0),
+    ("ffb", "spring_amps_450", float, 0.0, 6.0),
+    ("ffb", "spring_amps_540", float, 0.0, 6.0),
     ("ffb", "damper_amps_per_turn_s", float, 0.0, 20.0),
     ("ffb", "friction_amps", float, 0.0, 1.0),
     ("ffb", "inertia_amps_per_turn_s2", float, 0.0, 5.0),
@@ -256,6 +262,12 @@ def validate(p, require_measured=False):
         errors.append("odrive.watchdog_timeout must be at least 4 command periods")
     if f("vbus_derate_start_v") > 0 and not (f("vbus_min_v") < f("vbus_derate_start_v") < f("vbus_derate_end_v") < f("vbus_max_v")):
         errors.append("need ffb.vbus_min_v < vbus_derate_start_v < vbus_derate_end_v < vbus_max_v (or vbus_derate_start_v = 0 to switch it off)")
+    curve = [f("spring_amps_%d" % d) for d in (90, 180, 270, 360, 450, 540)]
+    if any(curve):
+        if any(b < a for a, b in zip(curve, curve[1:])):
+            errors.append("ffb.spring_amps_90 .. spring_amps_540 must not decrease with the angle")
+        if max(curve) > f("max_amps"):
+            warnings.append("ffb.spring_amps_* above ffb.max_amps are cut at max_amps (the curve goes flat there)")
     if f("periodic_max_amps") > f("max_amps"):
         warnings.append("ffb.periodic_max_amps > ffb.max_amps: the periodic limit has no effect")
     if f("stale_ms") < 3 * f("command_period_ms"):
@@ -359,6 +371,8 @@ def gen_header(p):
     m("FFB_PERIODIC_MAX_AMPS", c_float(f("periodic_max_amps")), "the periodic part alone is limited to this (A)")
     m("FFB_REGEN_POWER_LIMIT_W", c_float(f("regen_power_limit_w")), "W the motor may take out of the wheel (braking power limit, 0 = off)")
     m("FFB_TORQUE_CONSTANT_NOMINAL", c_float(o("torque_constant")), "Nm/A, only for the regeneration power estimate")
+    for d in (90, 180, 270, 360, 450, 540):
+        m("FFB_SPRING_AMPS_%d" % d, c_float(f("spring_amps_%d" % d)), "centring force (A) at %d deg from the centre" % d)
     m("FFB_SPRING_KP", c_float(f("spring_kp_amps_per_turn")), "A per wheel turn")
     m("FFB_DAMPER_KD", c_float(f("damper_amps_per_turn_s")), "A per wheel turn/s")
     m("FFB_FRICTION_AMPS", c_float(f("friction_amps")))

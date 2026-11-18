@@ -129,6 +129,17 @@ class TestProfile(unittest.TestCase):
             for name in ("FFB_GAIN_PERIODIC", "FFB_GAIN_CONSTANT", "FFB_GAIN_CONDITION", "FFB_PERIODIC_MAX_AMPS"):
                 self.assertIn(name, out)
 
+    def test_spring_curve_must_not_decrease(self):
+        p = load()
+        set_val(p, "ffb", "spring_amps_270", 0.5)                     # below the 180 deg point
+        errors, _ = gen_config.validate(p)
+        self.assertTrue(any("spring_amps" in e for e in errors))
+        p = load()
+        for d in (90, 180, 270, 360, 450, 540):
+            set_val(p, "ffb", "spring_amps_%d" % d, 0.0)              # all zero = the straight line: allowed
+        errors, _ = gen_config.validate(p)
+        self.assertFalse(any("spring_amps" in e for e in errors))
+
     def test_ffb_max_amps_above_hard_cap_is_error(self):
         p = load()
         set_val(p, "ffb", "max_amps", 6.5)

@@ -83,11 +83,29 @@
 #ifndef FFB_TORQUE_CONSTANT_NOMINAL
 #define FFB_TORQUE_CONSTANT_NOMINAL   0.5f   /* Nm/A, only for the regeneration power estimate */
 #endif
+#ifndef FFB_SPRING_AMPS_90
+#define FFB_SPRING_AMPS_90            1.0f   /* centring force (A) at 90 deg from the centre */
+#endif
+#ifndef FFB_SPRING_AMPS_180
+#define FFB_SPRING_AMPS_180           1.8f   /* centring force (A) at 180 deg from the centre */
+#endif
+#ifndef FFB_SPRING_AMPS_270
+#define FFB_SPRING_AMPS_270           2.5f   /* centring force (A) at 270 deg from the centre */
+#endif
+#ifndef FFB_SPRING_AMPS_360
+#define FFB_SPRING_AMPS_360           3.2f   /* centring force (A) at 360 deg from the centre */
+#endif
+#ifndef FFB_SPRING_AMPS_450
+#define FFB_SPRING_AMPS_450           4.0f   /* centring force (A) at 450 deg from the centre */
+#endif
+#ifndef FFB_SPRING_AMPS_540
+#define FFB_SPRING_AMPS_540           5.0f   /* centring force (A) at 540 deg from the centre */
+#endif
 #ifndef FFB_SPRING_KP
 #define FFB_SPRING_KP                 3.0f   /* A per wheel turn */
 #endif
 #ifndef FFB_DAMPER_KD
-#define FFB_DAMPER_KD                 0.25f   /* A per wheel turn/s */
+#define FFB_DAMPER_KD                 1.0f   /* A per wheel turn/s */
 #endif
 #ifndef FFB_FRICTION_AMPS
 #define FFB_FRICTION_AMPS             0.03f
@@ -99,7 +117,7 @@
 #define FFB_ENDSTOP_WIDTH_DEG         60.0f
 #endif
 #ifndef FFB_ENDSTOP_AMPS
-#define FFB_ENDSTOP_AMPS              5.0f
+#define FFB_ENDSTOP_AMPS              1.0f
 #endif
 #ifndef FFB_ENDSTOP_DAMPING
 #define FFB_ENDSTOP_DAMPING           0.3f

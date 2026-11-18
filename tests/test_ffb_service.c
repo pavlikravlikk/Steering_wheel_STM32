@@ -398,7 +398,7 @@ TEST(test_svc_spring_sign_units_and_slew)
     ffb_service_cfg_t c = cfg_armable();
     int from;
     float last = 0.0f;
-    float ang;
+    float ang, want;
     mock_ready();
     M.torque_constant = kts[k];
     T = 0;
@@ -406,7 +406,13 @@ TEST(test_svc_spring_sign_units_and_slew)
     to_running(&s);
     CHECK_EQ_INT(s.sm.state, FFB_STATE_RUNNING);
     /* up to 0.4 wheel turn to one side, but small enough that the spring stays below the clamp for ANY profile */
-    ang = (0.4f * FFB_SPRING_KP > 0.5f * FFB_MAX_AMPS) ? (0.5f * FFB_MAX_AMPS / FFB_SPRING_KP) : 0.4f;
+    ang = 0.4f;
+    want = s.tcfg.spring_curve_on ? ffb_fx_spring_curve(s.tcfg.spring_curve, ang) : (-FFB_SPRING_KP * ang);
+    if (fabsf(want) > 0.5f * FFB_MAX_AMPS)
+    {
+      ang = 0.1f;                              /* a profile whose spring would reach the clamp at 0.4 turn */
+      want = s.tcfg.spring_curve_on ? ffb_fx_spring_curve(s.tcfg.spring_curve, ang) : (-FFB_SPRING_KP * ang);
+    }
     M.angle = ang;
     from = M.nwrites;
     run_ms(&s, 2000, false, 0);
@@ -420,9 +426,9 @@ TEST(test_svc_spring_sign_units_and_slew)
         last = t;
       }
     }
-    /* settled value = -kp * angle * kt (inside the end stops, no motion) */
-    CHECK_NEAR(last, -FFB_SPRING_KP * ang * kts[k], 1e-3 + 1e-4 * kts[k]);
-    CHECK_NEAR(s.last_amps, -FFB_SPRING_KP * ang, 1e-3);
+    /* settled value = the spring force (the curve, or -kp * angle) * kt (inside the end stops, no motion) */
+    CHECK_NEAR(last, want * kts[k], 1e-3 + 1e-4 * kts[k]);
+    CHECK_NEAR(s.last_amps, want, 1e-3);
   }
 }
 
