@@ -19,7 +19,7 @@ import argparse
 import sys
 import time
 
-CURRENT_LIM_MAX = 4.0
+CURRENT_LIM_MAX = 6.0
 CALIBRATION_CURRENT_MAX = 3.0
 CPR = 2400
 CONFIRM_TEXT = "I AM CLEAR"

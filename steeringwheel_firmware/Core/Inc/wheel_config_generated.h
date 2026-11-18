@@ -57,7 +57,7 @@
 
 /* --- FFB limits (used only with -DWHEEL_FFB=ON) ----------------------- */
 #ifndef FFB_PROFILE_MAX_AMPS
-#define FFB_PROFILE_MAX_AMPS          3.0f
+#define FFB_PROFILE_MAX_AMPS          6.0f
 #endif
 #ifndef FFB_SLEW_AMPS_PER_S
 #define FFB_SLEW_AMPS_PER_S           100.0f
@@ -81,7 +81,7 @@
 #define FFB_ENDSTOP_WIDTH_DEG         10.0f
 #endif
 #ifndef FFB_ENDSTOP_AMPS
-#define FFB_ENDSTOP_AMPS              3.0f
+#define FFB_ENDSTOP_AMPS              6.0f
 #endif
 #ifndef FFB_ENDSTOP_DAMPING
 #define FFB_ENDSTOP_DAMPING           0.3f
@@ -111,7 +111,7 @@
 #define FFB_ARM_HOLD_MS               3000U
 #endif
 #ifndef FFB_PRECHECK_CURRENT_LIM_MAX
-#define FFB_PRECHECK_CURRENT_LIM_MAX  4.0f   /* live value must be <= this */
+#define FFB_PRECHECK_CURRENT_LIM_MAX  6.0f   /* live value must be <= this */
 #endif
 #ifndef FFB_PRECHECK_VEL_LIMIT_MAX
 #define FFB_PRECHECK_VEL_LIMIT_MAX    4.0f   /* live value must be <= this */

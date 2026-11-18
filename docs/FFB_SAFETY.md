@@ -76,7 +76,7 @@ If a check fails the wheel stays DISARMED and shows the reason (section 6).
 |---|---|---|
 | Accidental motor command in the normal build | No write code compiled; binary scan; source scan; tests | `check_all.sh`, `test_safety.c` |
 | Firmware writes a wrong setting | Writes restricted to 3 command kinds by an allowlist | `ffb_cmd.c` |
-| Too much current | Total command clamped to `ffb.max_amps` (hard cap in code: `FFB_HARD_CAP_AMPS`, 3 A since 2026-11-18, 1 A before); the ODrive's own `current_lim` must be <= the profile or no arming | `ffb_torque.c`, precheck |
+| Too much current | Total command clamped to `ffb.max_amps` (hard cap in code: `FFB_HARD_CAP_AMPS`, 6 A since 2026-11-18, 1 A before); the ODrive's own `current_lim` must be <= the profile or no arming | `ffb_torque.c`, precheck |
 | Sudden jumps | Slew-rate limit (`ffb.slew_amps_per_s`, 100 A/s since 2026-11-17; 5 A/s at first); RUNNING starts from 0 A | `ffb_torque.c` |
 | Wheel spinning away (no end stop, 4 kg) | Soft end stops beyond +-lock/2 with damping; OVERSPEED fault at `ffb.overspeed_turns_s`; the ODrive's `vel_limit` (the profile value, 4 turns/s since 2026-11-17) with `enable_current_mode_vel_limit` and `enable_overspeed_error` (names in this build) | `ffb_torque.c`, `ffb_safety.c`, ODrive |
 | STM32 hangs or the UART is unplugged | ODrive **watchdog** (required by the precheck) stops the axis after `watchdog_timeout` without `u 0`; on the STM32 side UART_TIMEOUT / POSITION_STALE faults | ODrive, `ffb_safety.c` |
@@ -194,8 +194,8 @@ Keep a hand on the 24 V switch for every F-step. Stop at the first surprise.
   constant force; set `FFB_INVERT_HOST_FORCE` if it pulls the wrong way. `evtest` shows the
   FF capabilities. Then a game, with its FFB strength at 20 %.
 - **F8 Wheel mounted:** only after F0-F7 and with the hardware e-stop fitted. Raise
-  `ffb.max_amps` in small steps; the code ceiling is `FFB_HARD_CAP_AMPS` (1 A until 2026-11-17, 3 A since the owner decision of 2026-11-18 for the DISMOUNTED wheel;
-  mounting the wheel at 3 A needs the items of section 5: mechanical stop, hardware e-stop, OVERSPEED test).
+  `ffb.max_amps` in small steps; the code ceiling is `FFB_HARD_CAP_AMPS` (1 A until 2026-11-17, 6 A since the owner decisions of 2026-11-18 for the DISMOUNTED wheel;
+  mounting the wheel at 6 A needs the items of section 5: mechanical stop, hardware e-stop, OVERSPEED test).
 
 ## 9. Verified only against the spec / host tests
 

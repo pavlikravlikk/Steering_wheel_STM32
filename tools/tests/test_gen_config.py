@@ -107,13 +107,13 @@ class TestProfile(unittest.TestCase):
 
     def test_calibration_current_above_current_lim_is_error(self):
         p = load()
-        set_val(p, "odrive", "calibration_current", 5.0)
+        set_val(p, "odrive", "calibration_current", 7.0)
         errors, _ = gen_config.validate(p)
         self.assertTrue(any("calibration_current" in e for e in errors))
 
     def test_ffb_max_amps_above_hard_cap_is_error(self):
         p = load()
-        set_val(p, "ffb", "max_amps", 3.5)
+        set_val(p, "ffb", "max_amps", 6.5)
         errors, _ = gen_config.validate(p)
         self.assertTrue(any("ffb.max_amps" in e for e in errors))
 
@@ -206,16 +206,16 @@ class TestSetupScript(unittest.TestCase):
         self.assertNotIn("PARSE WARN", out)
         self.assertNotIn("NOT IN DUMP", out)
         # old -> new against the real saved values
-        self.assertRegex(out, r"axis0\.motor\.config\.current_lim\s+12\.0\s+4\.0\s+<-- change")
+        self.assertRegex(out, r"axis0\.motor\.config\.current_lim\s+12\.0\s+6\.0\s+<-- change")
         self.assertRegex(out, r"axis0\.controller\.config\.control_mode\s+3\s+1\s+<-- change")
         self.assertRegex(out, r"axis0\.config\.startup_closed_loop_control\s+True\s+False\s+<-- change")
         self.assertRegex(out, r"config\.dc_max_negative_current\s+-3\.0\s+-1\.5\s+<-- change")   # 50 W resistor
-        self.assertIn("odrv0.axis0.motor.config.current_lim = 4.0", out)
+        self.assertIn("odrv0.axis0.motor.config.current_lim = 6.0", out)
         self.assertIn("odrv0.config.dc_max_negative_current = -1.5", out)
         self.assertIn("odrv0.axis0.motor.config.torque_constant = 0.5", out)
         self.assertNotIn("odrv0.axis0.motor.config.pole_pairs", out)
         self.assertIn("15 change(s)", out)          # 14 + vel_gain (0.02 -> 0.25, bench 2026-11-17)
-        self.assertIn("odrv0.axis0.controller.config.vel_gain = 0.4", out)
+        self.assertIn("odrv0.axis0.controller.config.vel_gain = 0.8", out)
 
     def test_dry_run_without_dump_lists_everything(self):
         buf = io.StringIO()
@@ -242,7 +242,7 @@ class TestSetupScript(unittest.TestCase):
         out = []
         self.assertEqual(self.mod.apply(odrv, write=False, out=out.append), 0)
         self.assertEqual(odrv.writes, [])
-        self.assertTrue(any("12.0 -> 4.0" in line for line in out))
+        self.assertTrue(any("12.0 -> 6.0" in line for line in out))
 
     def test_apply_writes_only_differences_and_does_not_save(self):
         vals = ready_values(self.p)
