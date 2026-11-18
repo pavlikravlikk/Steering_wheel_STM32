@@ -68,6 +68,9 @@ RANGES = [
     ("ffb", "max_amps", float, 0.0, 6.0),
     ("ffb", "slew_amps_per_s", float, 0.01, 1000.0),
     ("ffb", "vel_filter_hz", float, 0.0, 200.0),
+    ("ffb", "stop_start_deg", float, 0.0, 3600.0),
+    ("ffb", "stop_full_deg", float, 1.0, 3600.0),
+    ("ffb", "stop_amps", float, 0.0, 6.0),
     ("ffb", "host_gain", float, 0.1, 10.0),
     ("ffb", "gain_periodic", float, 0.0, 10.0),
     ("ffb", "gain_constant", float, 0.0, 10.0),
@@ -215,7 +218,8 @@ def validate(p, require_measured=False):
             errors.append("%s.%s = %r outside the allowed range [%s, %s]" % (section, key, v, lo, hi))
     for section, key in (("wheel", "invert"), ("encoder", "has_index"), ("mcp23017", "use_ipol"),
                          ("odrive", "enable_watchdog"), ("odrive", "enable_current_mode_vel_limit"),
-                         ("odrive", "enable_overspeed_error"), ("ffb", "invert_game_direction")):
+                         ("odrive", "enable_overspeed_error"), ("ffb", "invert_game_direction"),
+                         ("ffb", "spring_only_without_host")):
         try:
             v = val(p, section, key)
             if not isinstance(v, bool):
@@ -269,6 +273,8 @@ def validate(p, require_measured=False):
             errors.append("ffb.spring_amps_90 .. spring_amps_540 must not decrease with the angle")
         if max(curve) > f("max_amps"):
             warnings.append("ffb.spring_amps_* above ffb.max_amps are cut at max_amps (the curve goes flat there)")
+    if f("stop_amps") > 0 and not (f("stop_start_deg") < f("stop_full_deg")):
+        errors.append("ffb.stop_start_deg must be below ffb.stop_full_deg")
     if f("periodic_max_amps") > f("max_amps"):
         warnings.append("ffb.periodic_max_amps > ffb.max_amps: the periodic limit has no effect")
     if f("stale_ms") < 3 * f("command_period_ms"):
@@ -365,6 +371,10 @@ def gen_header(p):
     o = lambda k: val(p, "odrive", k)  # noqa: E731
     m("FFB_PROFILE_MAX_AMPS", c_float(f("max_amps")))
     m("FFB_SLEW_AMPS_PER_S", c_float(f("slew_amps_per_s")))
+    m("FFB_SPRING_ONLY_WITHOUT_HOST", "1" if f("spring_only_without_host") else "0", "1 = our centring spring is OFF while the game plays effects")
+    m("FFB_STOP_START_DEG", c_float(f("stop_start_deg")), "soft stop (while the game plays) starts here")
+    m("FFB_STOP_FULL_DEG", c_float(f("stop_full_deg")), "soft stop reaches stop_amps here")
+    m("FFB_STOP_AMPS", c_float(f("stop_amps")), "soft stop force at stop_full_deg")
     m("FFB_VEL_FILTER_HZ", c_float(f("vel_filter_hz")), "low-pass on the wheel speed for damper/friction (0 = off)")
     m("FFB_INVERT_GAME_DIRECTION", "1" if f("invert_game_direction") else "0", "1 = mirror the direction of constant/ramp/periodic game effects")
     m("FFB_HOST_GAIN", c_float(f("host_gain")), "game force x gain, then clamped (max_amps is still the cap)")

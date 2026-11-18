@@ -724,6 +724,37 @@ TEST(test_speed_filter_smooths_the_damper)
   CHECK_NEAR(a, -1.0, 1e-6);
 }
 
+TEST(test_soft_stop_instead_of_the_spring_while_the_game_plays)
+{
+  ffb_torque_cfg_t c = tcfg_plain();
+  ffb_torque_state_t st;
+  ffb_axis_t ax = { 0.0f, 0.0f };
+  float a = 0.0f;
+  c.stop_start_turns = 1.0f; c.stop_full_turns = 1.5f; c.stop_amps = 5.0f;
+  c.max_amps = 5.0f; c.slew_amps_per_s = 1.0e6f; c.regen_power_w = 0.0f;
+  c.damper_kd = 0.0f; c.friction_amps = 0.0f; c.inertia_k = 0.0f;
+  c.half_range_turns = 10.0f;                                   /* the end-stop wall is out of the way */
+  CHECK_NEAR(ffb_fx_soft_stop(&c, 0.5f), 0.0, 1e-6);            /* no pull between the centre and 1 turn */
+  CHECK_NEAR(ffb_fx_soft_stop(&c, 1.0f), 0.0, 1e-6);
+  CHECK_NEAR(ffb_fx_soft_stop(&c, 1.25f), -2.5, 1e-5);          /* half way: half of the force */
+  CHECK_NEAR(ffb_fx_soft_stop(&c, 1.5f), -5.0, 1e-5);
+  CHECK_NEAR(ffb_fx_soft_stop(&c, 3.0f), -5.0, 1e-5);
+  CHECK_NEAR(ffb_fx_soft_stop(&c, -1.25f), 2.5, 1e-5);          /* symmetric, restoring */
+  c.stop_amps = 0.0f;
+  CHECK_NEAR(ffb_fx_soft_stop(&c, 1.4f), 0.0, 1e-6);            /* off */
+  c.stop_amps = 5.0f;
+  /* the pipeline: the game plays (spring_enabled false) -> a wheel turned 0.7 turn is NOT pulled to the centre */
+  ffb_torque_reset(&st);
+  ax.angle_turns = 0.7f;
+  CHECK(ffb_torque_step(&c, &st, &ax, 0.0f, false, 0.005f, &a));
+  CHECK_NEAR(a, 0.0, 1e-6);
+  /* nothing playing (spring_enabled true): our centring spring pulls back */
+  c.spring_curve_on = false; c.spring_kp = 2.0f;
+  ffb_torque_reset(&st);
+  CHECK(ffb_torque_step(&c, &st, &ax, 0.0f, true, 0.005f, &a));
+  CHECK_NEAR(a, -1.4, 1e-5);
+}
+
 TEST(test_spring_curve)
 {
   const float amps[FFB_SPRING_CURVE_N] = { 1.0f, 1.8f, 2.5f, 3.2f, 4.0f, 5.0f };
@@ -1091,6 +1122,7 @@ void run_ffb_core_tests(void)
   RUN(test_torque_endstop_shape);
   RUN(test_torque_clamp_and_hard_cap);
   RUN(test_speed_filter_smooths_the_damper);
+  RUN(test_soft_stop_instead_of_the_spring_while_the_game_plays);
   RUN(test_spring_curve);
   RUN(test_regen_limit);
   RUN(test_regen_limit_in_the_torque_step);

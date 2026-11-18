@@ -62,8 +62,20 @@
 #ifndef FFB_SLEW_AMPS_PER_S
 #define FFB_SLEW_AMPS_PER_S           80.0f
 #endif
+#ifndef FFB_SPRING_ONLY_WITHOUT_HOST
+#define FFB_SPRING_ONLY_WITHOUT_HOST  1   /* 1 = our centring spring is OFF while the game plays effects */
+#endif
+#ifndef FFB_STOP_START_DEG
+#define FFB_STOP_START_DEG            360.0f   /* soft stop (while the game plays) starts here */
+#endif
+#ifndef FFB_STOP_FULL_DEG
+#define FFB_STOP_FULL_DEG             540.0f   /* soft stop reaches stop_amps here */
+#endif
+#ifndef FFB_STOP_AMPS
+#define FFB_STOP_AMPS                 5.0f   /* soft stop force at stop_full_deg */
+#endif
 #ifndef FFB_VEL_FILTER_HZ
-#define FFB_VEL_FILTER_HZ             15.0f   /* low-pass on the wheel speed for damper/friction (0 = off) */
+#define FFB_VEL_FILTER_HZ             12.0f   /* low-pass on the wheel speed for damper/friction (0 = off) */
 #endif
 #ifndef FFB_INVERT_GAME_DIRECTION
 #define FFB_INVERT_GAME_DIRECTION     1   /* 1 = mirror the direction of constant/ramp/periodic game effects */
@@ -72,7 +84,7 @@
 #define FFB_HOST_GAIN                 1.0f   /* game force x gain, then clamped (max_amps is still the cap) */
 #endif
 #ifndef FFB_GAIN_PERIODIC
-#define FFB_GAIN_PERIODIC             5.0f   /* game texture (sine/square/triangle/saw) x gain */
+#define FFB_GAIN_PERIODIC             8.0f   /* game texture (sine/square/triangle/saw) x gain */
 #endif
 #ifndef FFB_GAIN_CONSTANT
 #define FFB_GAIN_CONSTANT             1.5f   /* game constant force / ramp x gain */
@@ -81,7 +93,7 @@
 #define FFB_GAIN_CONDITION            1.0f   /* game spring/damper/friction/inertia x gain (keep low: closed loop) */
 #endif
 #ifndef FFB_PERIODIC_MAX_AMPS
-#define FFB_PERIODIC_MAX_AMPS         1.5f   /* the periodic part alone is limited to this (A) */
+#define FFB_PERIODIC_MAX_AMPS         2.2f   /* the periodic part alone is limited to this (A) */
 #endif
 #ifndef FFB_REGEN_POWER_LIMIT_W
 #define FFB_REGEN_POWER_LIMIT_W       20.0f   /* W the motor may take out of the wheel (braking power limit, 0 = off) */
@@ -111,10 +123,10 @@
 #define FFB_SPRING_KP                 3.0f   /* A per wheel turn */
 #endif
 #ifndef FFB_DAMPER_KD
-#define FFB_DAMPER_KD                 0.5f   /* A per wheel turn/s */
+#define FFB_DAMPER_KD                 0.3f   /* A per wheel turn/s */
 #endif
 #ifndef FFB_FRICTION_AMPS
-#define FFB_FRICTION_AMPS             0.05f
+#define FFB_FRICTION_AMPS             0.04f
 #endif
 #ifndef FFB_INERTIA_KI
 #define FFB_INERTIA_KI                0.0f   /* placeholder */

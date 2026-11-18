@@ -36,6 +36,9 @@ typedef struct
   float endstop_damping;      /* A per wheel turn/s inside the wall        */
   float max_amps;             /* total clamp (<= FFB_HARD_CAP_AMPS)        */
   float slew_amps_per_s;
+  float stop_start_turns;     /* while the game plays: no centring at all, only a soft stop that starts here ... */
+  float stop_full_turns;      /* ... and reaches stop_amps here (smoothstep)                                   */
+  float stop_amps;
   float vel_filter_hz;        /* low-pass on the wheel speed used by damper, friction, wall damping (0 = off) */
   float regen_power_w;        /* mechanical power the motor may take OUT of the wheel (0 = no limit)  */
   float kt_nominal;           /* Nm per A (profile), only for that power estimate                     */
@@ -63,6 +66,11 @@ void ffb_torque_reset(ffb_torque_state_t *st);
 float ffb_fx_spring(float kp, float angle_turns);
 /** Centring force from a curve: amps[i] at (i+1) * FFB_SPRING_CURVE_STEP_DEG degrees, linear in between and from 0 at the centre,
  *  held at the last value beyond. Restoring (opposite sign to the angle), symmetric. */
+/** Soft stop used INSTEAD of the centring force while the game plays its own effects (a real car does not pull the wheel to the
+ *  centre when it stands still; the game adds the self-aligning force with the speed). 0 up to stop_start, then a smoothstep to
+ *  stop_amps at stop_full; restoring (opposite sign to the angle), symmetric. */
+float ffb_fx_soft_stop(const ffb_torque_cfg_t *cfg, float angle_turns);
+
 float ffb_fx_spring_curve(const float amps[FFB_SPRING_CURVE_N], float angle_turns);
 float ffb_fx_damper(float kd, float vel_turns_s);
 float ffb_fx_friction(float amps, float vel_eps, float vel_turns_s);

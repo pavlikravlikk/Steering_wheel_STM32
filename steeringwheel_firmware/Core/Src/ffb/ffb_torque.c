@@ -42,6 +42,9 @@ void ffb_torque_default_cfg(ffb_torque_cfg_t *cfg)
   cfg->endstop_damping = FFB_ENDSTOP_DAMPING;
   cfg->max_amps = FFB_MAX_AMPS;
   cfg->slew_amps_per_s = FFB_SLEW_AMPS_PER_S;
+  cfg->stop_start_turns = FFB_STOP_START_DEG / 360.0f;
+  cfg->stop_full_turns = FFB_STOP_FULL_DEG / 360.0f;
+  cfg->stop_amps = FFB_STOP_AMPS;
   cfg->vel_filter_hz = FFB_VEL_FILTER_HZ;
   cfg->regen_power_w = FFB_REGEN_POWER_LIMIT_W;
   cfg->kt_nominal = FFB_TORQUE_CONSTANT_NOMINAL;
@@ -102,6 +105,24 @@ float ffb_vbus_derate(float vbus, float start_v, float end_v)
     return 0.0f;
   }
   return (end_v - vbus) / (end_v - start_v);
+}
+
+float ffb_fx_soft_stop(const ffb_torque_cfg_t *cfg, float angle_turns)
+{
+  const float a = absf(angle_turns);
+  float x;
+
+  if (!finite_f(a) || !(cfg->stop_amps > 0.0f) || !(cfg->stop_full_turns > cfg->stop_start_turns) || (a <= cfg->stop_start_turns))
+  {
+    return 0.0f;
+  }
+  x = (a - cfg->stop_start_turns) / (cfg->stop_full_turns - cfg->stop_start_turns);
+  if (x > 1.0f)
+  {
+    x = 1.0f;
+  }
+  x = cfg->stop_amps * (x * x * (3.0f - (2.0f * x)));
+  return (angle_turns >= 0.0f) ? -x : x;
 }
 
 float ffb_fx_spring_curve(const float amps[FFB_SPRING_CURVE_N], float angle_turns)
@@ -186,6 +207,10 @@ float ffb_layer_a(const ffb_torque_cfg_t *cfg, ffb_torque_state_t *st, const ffb
   {
     sum += cfg->spring_curve_on ? ffb_fx_spring_curve(cfg->spring_curve, ax->angle_turns)
                                 : ffb_fx_spring(cfg->spring_kp, ax->angle_turns);
+  }
+  else
+  {
+    sum += ffb_fx_soft_stop(cfg, ax->angle_turns);   /* the game plays: no centring, only the soft stop near the end */
   }
   sum += ffb_fx_damper(cfg->damper_kd, ax->vel_turns_s);
   sum += ffb_fx_friction(cfg->friction_amps, cfg->friction_vel_eps, ax->vel_turns_s);
