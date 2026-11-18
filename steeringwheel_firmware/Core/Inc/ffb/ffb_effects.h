@@ -62,6 +62,7 @@ typedef struct
   float constant;        /* constant, ramp (cornering, impacts)                  */
   float condition;       /* spring, damper, inertia, friction                    */
   float periodic_cap;    /* the periodic part alone is limited to +-this (normalised, 0..1) */
+  float direction_sign;  /* +1, or -1 = the direction of constant / ramp / periodic effects is mirrored (conditions are not) */
 } ffb_fx_gains_t;
 
 typedef struct
@@ -86,6 +87,11 @@ void ffb_fx_init(ffb_fx_engine_t *e);
 
 /** Set the per-kind gains (values that are not finite or negative become 1; the cap is limited to 0..1, 0 or less = 1). */
 void ffb_fx_set_gains(ffb_fx_engine_t *e, float periodic, float constant, float condition, float periodic_cap);
+
+/** Mirror the direction of the effects that carry one (constant, ramp, periodic): for a host whose left/right convention is
+ *  the opposite of ours (a constant force that pushes the wheel AWAY from the centre where it should pull back). Spring, damper,
+ *  friction and inertia depend on the wheel's own position or speed and are never mirrored. */
+void ffb_fx_set_direction_invert(ffb_fx_engine_t *e, bool invert);
 
 /** PID Device Reset: stop and free everything, defaults back. */
 void ffb_fx_reset(ffb_fx_engine_t *e);

@@ -343,6 +343,41 @@ TEST(test_fx_gains_per_kind)
   CHECK_NEAR(E.gains.periodic_cap, 1.0, 1e-6);
 }
 
+/* Mirroring the direction touches constant / ramp / periodic only, never the conditions (they depend on the wheel's own position). */
+TEST(test_fx_direction_invert_leaves_conditions_alone)
+{
+  const uint8_t per[] = { FFB_RID_SET_PERIODIC, 1, 0x10, 0x27, 0, 0, 0, 0, 100, 0 };
+  fresh();
+  ffb_fx_set_direction_invert(&E, true);
+  create(FFB_ET_CONSTANT);
+  set_effect(1, FFB_ET_CONSTANT, FFB_TIME_INFINITE, 0, 255, 9000);   /* 90 deg = +X */
+  set_constant(1, 5000);
+  op(1, FFB_OP_START, 1, 0);
+  CHECK_NEAR(force(10, 0, 0), -0.5, 2e-3);                           /* mirrored */
+  fresh();
+  ffb_fx_set_direction_invert(&E, true);
+  create(FFB_ET_SINE);
+  set_effect(1, FFB_ET_SINE, FFB_TIME_INFINITE, 0, 255, 9000);
+  CHECK(out(per, sizeof(per), 0));
+  op(1, FFB_OP_START, 1, 0);
+  CHECK_NEAR(force(25, 0, 0), -1.0, 0.012);                          /* the sine too */
+  fresh();
+  ffb_fx_set_direction_invert(&E, true);
+  create(FFB_ET_SPRING);
+  set_effect(1, FFB_ET_SPRING, FFB_TIME_INFINITE, 0, 255, 0);
+  set_cond(1, 0, 10000, 5000, 10000, 3000, 1000);
+  op(1, FFB_OP_START, 1, 0);
+  CHECK_NEAR(force(2, 0.5f, 0), -0.4, 2e-3);                         /* NOT mirrored: still pulls back to the centre */
+  CHECK_NEAR(force(3, -0.5f, 0), 0.2, 2e-3);
+  ffb_fx_set_direction_invert(&E, false);
+  fresh();
+  create(FFB_ET_CONSTANT);
+  set_effect(1, FFB_ET_CONSTANT, FFB_TIME_INFINITE, 0, 255, 9000);
+  set_constant(1, 5000);
+  op(1, FFB_OP_START, 1, 0);
+  CHECK_NEAR(force(10, 0, 0), 0.5, 2e-3);                            /* back to normal */
+}
+
 TEST(test_fx_damper_friction_inertia)
 {
   fresh();
@@ -494,7 +529,7 @@ TEST(test_pid_glue_create_handshake)
     ffb_pid_rx_isr(FFB_REPORT_OUTPUT, sc, sizeof(sc));
     ffb_pid_rx_isr(FFB_REPORT_OUTPUT, st, sizeof(st));
     ffb_pid_poll(10, true, NULL);
-    CHECK_NEAR(ffb_pid_force(20, 0, 0, &active), (0.5f * FFB_GAIN_CONSTANT > 1.0f) ? 1.0f : 0.5f * FFB_GAIN_CONSTANT, 3e-3);   /* the profile's gain for constant forces */
+    CHECK_NEAR(ffb_pid_force(20, 0, 0, &active), ((0.5f * FFB_GAIN_CONSTANT > 1.0f) ? 1.0f : 0.5f * FFB_GAIN_CONSTANT) * ((FFB_INVERT_GAME_DIRECTION != 0) ? -1.0f : 1.0f), 3e-3);   /* the profile's gain for constant forces */
     CHECK(active);
     CHECK(ffb_pid_actuators_enabled());
     CHECK(ffb_pid_stats()->accepted >= 4);
@@ -514,6 +549,7 @@ void run_ffb_pid_tests(void)
   RUN(test_fx_ramp);
   RUN(test_fx_spring_condition);
   RUN(test_fx_gains_per_kind);
+  RUN(test_fx_direction_invert_leaves_conditions_alone);
   RUN(test_fx_damper_friction_inertia);
   RUN(test_fx_device_control_and_safety);
   RUN(test_fx_start_solo_and_total_clip);

@@ -65,6 +65,9 @@
 #ifndef FFB_VEL_FILTER_HZ
 #define FFB_VEL_FILTER_HZ             15.0f   /* low-pass on the wheel speed for damper/friction (0 = off) */
 #endif
+#ifndef FFB_INVERT_GAME_DIRECTION
+#define FFB_INVERT_GAME_DIRECTION     1   /* 1 = mirror the direction of constant/ramp/periodic game effects */
+#endif
 #ifndef FFB_HOST_GAIN
 #define FFB_HOST_GAIN                 1.0f   /* game force x gain, then clamped (max_amps is still the cap) */
 #endif

@@ -63,6 +63,7 @@ void ffb_fx_init(ffb_fx_engine_t *e)
 {
   memset(e, 0, sizeof(*e));
   ffb_fx_set_gains(e, 1.0f, 1.0f, 1.0f, 1.0f);
+  e->gains.direction_sign = 1.0f;
   ffb_fx_reset(e);
 }
 
@@ -72,6 +73,11 @@ void ffb_fx_set_gains(ffb_fx_engine_t *e, float periodic, float constant, float 
   e->gains.constant = (finite_f(constant) && (constant >= 0.0f)) ? constant : 1.0f;
   e->gains.condition = (finite_f(condition) && (condition >= 0.0f)) ? condition : 1.0f;
   e->gains.periodic_cap = (finite_f(periodic_cap) && (periodic_cap > 0.0f) && (periodic_cap < 1.0f)) ? periodic_cap : 1.0f;
+}
+
+void ffb_fx_set_direction_invert(ffb_fx_engine_t *e, bool invert)
+{
+  e->gains.direction_sign = invert ? -1.0f : 1.0f;
 }
 
 static bool is_periodic(uint8_t t)
@@ -308,7 +314,6 @@ float ffb_fx_eval(ffb_fx_engine_t *e, ffb_fx_t *f, uint32_t now_ms, float pos, f
   uint32_t elapsed;
   float out = 0.0f;
   const bool timed = (f->duration_ms != FFB_TIME_INFINITE) && (f->duration_ms > 0U);
-  (void)e;
 
   if (!f->allocated || !f->playing)
   {
@@ -376,6 +381,7 @@ float ffb_fx_eval(ffb_fx_engine_t *e, ffb_fx_t *f, uint32_t now_ms, float pos, f
   {
     out *= ffb_sin_turns((float)f->direction / (float)(FFB_DIR_MAX + 1U));
   }
+  out *= e->gains.direction_sign;            /* only constant / ramp / periodic reach this line (conditions returned above) */
   return clampf(out, -1.0f, 1.0f) * ((float)f->gain / 255.0f);
 }
 

@@ -20,6 +20,7 @@ Older, dated notes: `docs/archive/STATUS_HISTORY.md`.
 | `ffb.damper_amps_per_turn_s` / `friction_amps` | 1.6 / 0.12 A | more damping and a little friction against the hunting of the wheel on a straight road (gravel and viscous effects, which add damping, were fine) |
 | `ffb.slew_amps_per_s` | 40 | the current changes by at most 0.2 A per cycle (100 until 2026-11-18): smoother, softer impacts |
 | `ffb.vel_filter_hz` | 15 | low-pass on the wheel speed used by damper / friction / wall damping (less jerk from the noisy speed) |
+| `ffb.invert_game_direction` | true | MIRRORS the direction of the game's constant force / ramp / periodic effects (not spring/damper/friction/inertia). Set because the wheel wove on a straight road and pushed the wrong way; open until confirmed with a game: turn right at speed and let go, the wheel must come back to the centre |
 | `ffb.gain_periodic` / `gain_constant` / `gain_condition` | 5 / 2 / 1 | gain per kind of GAME effect: texture (gravel, rumble) x5, constant force and impacts x2, spring/damper/friction of the game x1 (closed loop, keep low); `host_gain` 1.0 stays as an overall multiplier |
 | `ffb.periodic_max_amps` | 1.5 A | the texture part alone is limited to this, so a strong rumble cannot drown the main force |
 | `ffb.endstop_width_deg` / `endstop_amps` | 60 deg / 1 A | only an EXTRA wall beyond the end of the range (the spring curve already reaches 5 A at 540 deg) |
@@ -30,7 +31,7 @@ Older, dated notes: `docs/archive/STATUS_HISTORY.md`.
 
 ### Not done / open
 - **Before the steering wheel is mounted (F8):** mechanical rotation stop, hardware e-stop on the 24 V side, DC fuse, heat sink on the brake resistor, go back from the B1-only arm gesture to B1 + both paddles. Not tested on hardware: OVERSPEED fault.
-- **FFB:** direction of game constant forces (`FFB_INVERT_HOST_FORCE`) is not recorded as confirmed; separate gains per effect type (gravel, impacts) do not exist yet; the ODrive calibration is repeated at every power-up (`tools/session_start.py`, written and tested with a fake ODrive, not yet run on the real one; the profile is never `--save`d).
+- **FFB:** direction of game constant forces: `ffb.invert_game_direction` is now true (owner report, not yet confirmed to fix it); separate gains per effect type (gravel, impacts) do not exist yet; the ODrive calibration is repeated at every power-up (`tools/session_start.py`, written and tested with a fake ODrive, not yet run on the real one; the profile is never `--save`d).
 - **HID:** pedals (Y/Z are 0), MCP23017 button board not connected, button mapping, I2C bus recovery, persistent settings not wired in.
 - **Repository:** the commits of 2026-11-17 are local until pushed; see `git status -sb`.
 

@@ -215,7 +215,7 @@ def validate(p, require_measured=False):
             errors.append("%s.%s = %r outside the allowed range [%s, %s]" % (section, key, v, lo, hi))
     for section, key in (("wheel", "invert"), ("encoder", "has_index"), ("mcp23017", "use_ipol"),
                          ("odrive", "enable_watchdog"), ("odrive", "enable_current_mode_vel_limit"),
-                         ("odrive", "enable_overspeed_error")):
+                         ("odrive", "enable_overspeed_error"), ("ffb", "invert_game_direction")):
         try:
             v = val(p, section, key)
             if not isinstance(v, bool):
@@ -366,6 +366,7 @@ def gen_header(p):
     m("FFB_PROFILE_MAX_AMPS", c_float(f("max_amps")))
     m("FFB_SLEW_AMPS_PER_S", c_float(f("slew_amps_per_s")))
     m("FFB_VEL_FILTER_HZ", c_float(f("vel_filter_hz")), "low-pass on the wheel speed for damper/friction (0 = off)")
+    m("FFB_INVERT_GAME_DIRECTION", "1" if f("invert_game_direction") else "0", "1 = mirror the direction of constant/ramp/periodic game effects")
     m("FFB_HOST_GAIN", c_float(f("host_gain")), "game force x gain, then clamped (max_amps is still the cap)")
     m("FFB_GAIN_PERIODIC", c_float(f("gain_periodic")), "game texture (sine/square/triangle/saw) x gain")
     m("FFB_GAIN_CONSTANT", c_float(f("gain_constant")), "game constant force / ramp x gain")
