@@ -17,10 +17,10 @@ Older, dated notes: `docs/archive/STATUS_HISTORY.md`.
 | `ffb.max_amps` | 5.0 A (about 2.5 Nm) | code ceiling `FFB_HARD_CAP_AMPS` is 6 A (raised 1 -> 3 -> 6 on 2026-11-18); steps were 0.3, 0.5, 0.8, 1.0, 3.0, 6.0, then back to 4.0 after the supply rose 24 -> 28 V (regeneration) against the 6 A wall; needs `odrive.current_lim` 6 A. **Wheel must stay dismounted at this value** |
 | `ffb.host_gain` | 1.0 (off) | game force x gain, then clamped; 5.0 until 2026-11-18, removed after the wheel swung between the end stops |
 | `ffb.spring_amps_90` ... `spring_amps_540` | 1.0, 1.8, 2.5, 3.2, 4.0, 5.0 A | the centring force is a CURVE (A at 90, 180, 270, 360, 450, 540 deg from the centre, linear between, held beyond): stiff in the middle and still rising up to 1.5 turns. `spring_kp_amps_per_turn` (3.0) is used only if all six are 0 |
-| `ffb.damper_amps_per_turn_s` | 1.0 | raised 0.25 -> 1.0 with the stiffer curve (less ringing) |
+| `ffb.damper_amps_per_turn_s` / `friction_amps` | 1.6 / 0.12 A | more damping and a little friction against the hunting of the wheel on a straight road (gravel and viscous effects, which add damping, were fine) |
 | `ffb.slew_amps_per_s` | 100 | |
-| `ffb.gain_periodic` / `gain_constant` / `gain_condition` | 2 / 1.5 / 1 (5 / 2 / 1 until the wheel jerked on a straight road) | gain per kind of GAME effect: texture (gravel, rumble) x5, constant force and impacts x2, spring/damper/friction of the game x1 (closed loop, keep low); `host_gain` 1.0 stays as an overall multiplier |
-| `ffb.periodic_max_amps` | 0.6 A | the texture part alone is limited to this, so a strong rumble cannot drown the main force |
+| `ffb.gain_periodic` / `gain_constant` / `gain_condition` | 5 / 2 / 1 | gain per kind of GAME effect: texture (gravel, rumble) x5, constant force and impacts x2, spring/damper/friction of the game x1 (closed loop, keep low); `host_gain` 1.0 stays as an overall multiplier |
+| `ffb.periodic_max_amps` | 1.5 A | the texture part alone is limited to this, so a strong rumble cannot drown the main force |
 | `ffb.endstop_width_deg` / `endstop_amps` | 60 deg / 1 A | only an EXTRA wall beyond the end of the range (the spring curve already reaches 5 A at 540 deg) |
 | `ffb.regen_power_limit_w` | 20 W | braking power limit: the current that OPPOSES the wheel's motion is limited so that kt x A x 2 pi x speed stays below this (a held wall keeps full force, a fast hit is cushioned); keeps the supply from rising |
 | `ffb.vbus_derate_start_v` / `_end_v` | 25.0 V / 26.5 V | regeneration guard: the force fades out linearly as the supply rises, instead of the VBUS_RANGE fault at 28 V (flag `vbus_derating` in the status report) |
