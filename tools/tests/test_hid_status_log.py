@@ -120,6 +120,19 @@ class TestRun(unittest.TestCase):
         self.assertIn("torque=+0.500", compact[0])
         self.assertIn("angle=+112", compact[0].replace("+113", "+112"))
 
+    def test_trace_csv_has_every_sample(self):
+        import tempfile
+        good = struct.pack("<BBBBBBhHHHH", 0x40, 1, 3, 0, 0, 0x19, -2500, 200, 150, 0, 241)
+        d = FakeDevice([good] * 5)
+        d.read_latest_x = lambda: 32768
+        path = os.path.join(tempfile.mkdtemp(), "t.csv")
+        hid_status_log.run(FakeHid([d]), None, 0.0, out=lambda s: None, sleep=lambda s: None, max_loops=4, trace_path=path)
+        rows = open(path).read().strip().splitlines()
+        self.assertEqual(rows[0].split(",")[0], "t_s")
+        self.assertEqual(len(rows), 1 + 4)
+        self.assertTrue(rows[1].endswith(",1"))                       # host_effects_playing
+        self.assertIn("-2.500", rows[1])
+
     def test_finds_the_length_windows_wants(self):
         good = struct.pack("<BBBBBBhHHHH", 0x40, 1, 3, 0, 0, 0x11, 500, 200, 150, 0, 241)
         d = FakeDevice([good, good])

@@ -13,6 +13,7 @@ Options:
     --diag          'wheel NOT readable'? shows every interface and every attempt with its error
     --log FILE      log file (appended, default wheel_log.txt; '' = none)
     --print-every S seconds between the lines on the screen (default 0.2, 0 = only changes)
+    --trace FILE    CSV with every sample (for an oscillation / vibration analysis)
     --interval S    seconds between reads (default 0.05)
 
 What it writes (only changes, so the file stays small):
@@ -295,8 +296,11 @@ def diagnose(hid_module, out=print):
 
 
 def run(hid_module, log_path, interval, once=False, out=print, sleep=time.sleep, clock=time.time, max_loops=None,
-        half_range_deg=DEFAULT_HALF_RANGE_DEG, print_every=0.2):
+        half_range_deg=DEFAULT_HALF_RANGE_DEG, print_every=0.2, trace_path=None):
     last_print = [None]
+    trace = open(trace_path, "a", encoding="utf-8") if trace_path else None
+    if trace:
+        trace.write("t_s,state,fault,torque_a,angle_deg,vbus_v,rate_hz,odrive_timeouts,host_effects\n")
     mon = Monitor(half_range_deg=half_range_deg)
     log = open(log_path, "a", encoding="utf-8") if log_path else None
 
@@ -332,6 +336,11 @@ def run(hid_module, log_path, interval, once=False, out=print, sleep=time.sleep,
                     r = read_status(dev)
                     x = read_x(dev)
                     lines = mon.feed(now, r, x)
+                    if trace:
+                        deg = "" if x is None else "%.2f" % ((x - 32768) / 32768.0 * half_range_deg)
+                        trace.write("%.3f,%s,%s,%.3f,%s,%.1f,%d,%d,%d\n" % (
+                            now, r["state"], r["fault"], r["torque_cmd_amps"], deg, r["vbus_v"], r["command_rate_hz"],
+                            r["odrive_timeouts"], 1 if "host_effects_playing" in r["flags"] else 0))
                     if log:
                         for line in lines:
                             log.write(line + "\n")
@@ -357,6 +366,8 @@ def run(hid_module, log_path, interval, once=False, out=print, sleep=time.sleep,
     finally:
         if log:
             log.close()
+        if trace:
+            trace.close()
 
 
 def main(argv=None):
@@ -368,6 +379,8 @@ def main(argv=None):
                     help="degrees from the centre to full X (lock-to-lock / 2; 450 for 900 deg)")
     ap.add_argument("--print-every", type=float, default=0.2,
                     help="seconds between the lines on the screen (0 = only the changes); the file always gets only the changes")
+    ap.add_argument("--trace", default="", help="CSV with EVERY sample (time, state, fault, torque, angle, vbus, rate, timeouts, "
+                    "host_effects), for analysing an oscillation; use --interval 0.02 for 50 samples/s")
     ap.add_argument("--interval", type=float, default=0.05, help="seconds between reads (default 0.05)")
     a = ap.parse_args(argv)
     if sys.platform.startswith("linux"):
@@ -383,7 +396,7 @@ def main(argv=None):
         return diagnose(hid)
     print("Monitoring the wheel (VID %04X PID %04X). Ctrl+C stops. Log: %s" % (VID, PID, a.log or "(none)"))
     return run(hid, a.log or None, a.interval, once=a.once, half_range_deg=a.half_range_deg,
-               print_every=a.print_every)
+               print_every=a.print_every, trace_path=a.trace or None)
 
 
 if __name__ == "__main__":
