@@ -19,6 +19,8 @@ Older, dated notes: `docs/archive/STATUS_HISTORY.md`.
 | `ffb.spring_kp_amps_per_turn` | 3.0 | the cap is reached at about 0.33 turn (120 deg) |
 | `ffb.damper_amps_per_turn_s` | 0.25 | |
 | `ffb.slew_amps_per_s` | 100 | |
+| `ffb.gain_periodic` / `gain_constant` / `gain_condition` | 5 / 2 / 1 | gain per kind of GAME effect: texture (gravel, rumble) x5, constant force and impacts x2, spring/damper/friction of the game x1 (closed loop, keep low); `host_gain` 1.0 stays as an overall multiplier |
+| `ffb.periodic_max_amps` | 1.5 A | the texture part alone is limited to this, so a strong rumble cannot drown the main force |
 | `ffb.endstop_width_deg` / `endstop_amps` | 60 deg / 4 A | the wall builds up over 60 deg (was 10 deg / 6 A): softer, less regeneration |
 | `ffb.vbus_derate_start_v` / `_end_v` | 25.0 V / 26.5 V | regeneration guard: the force fades out linearly as the supply rises, instead of the VBUS_RANGE fault at 28 V (flag `vbus_derating` in the status report) |
 | `odrive.vel_limit` / `vel_gain` | 4 turns/s / 0.8 (0.25 up to 1 A, 0.4 at 3 A) | `vel_limit * vel_gain >= max_amps * torque_constant` is enforced by `gen_config.py` |

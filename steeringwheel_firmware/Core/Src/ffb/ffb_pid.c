@@ -5,6 +5,8 @@
  */
 #include "ffb_pid.h"
 
+#include "ffb_config.h"
+
 #include <string.h>
 
 static uint16_t le16(const uint8_t *p)
@@ -287,6 +289,8 @@ static uint8_t          s_status_snapshot[FFB_LEN_STATUS];
 void ffb_pid_init(void)
 {
   ffb_fx_init(&s_engine);
+  /* the profile's gains per kind of effect (ffb.gain_periodic, gain_constant, gain_condition, periodic_max_amps) */
+  ffb_fx_set_gains(&s_engine, FFB_GAIN_PERIODIC, FFB_GAIN_CONSTANT, FFB_GAIN_CONDITION, FFB_PERIODIC_MAX_AMPS / FFB_MAX_AMPS);
   ffb_pid_queue_init(&s_queue);
   memset(&s_stats, 0, sizeof(s_stats));
   (void)ffb_pid_build_block_load(&s_engine, s_bl_snapshot, sizeof(s_bl_snapshot));

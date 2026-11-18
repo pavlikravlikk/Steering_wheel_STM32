@@ -8,6 +8,7 @@
 #include "ffb_effects.h"
 #include "ffb_hid_desc.h"
 #include "ffb_pid.h"
+#include "ffb_config.h"
 
 static ffb_fx_engine_t E;
 static ffb_pid_stats_t S;
@@ -301,6 +302,47 @@ TEST(test_fx_spring_condition)
   CHECK_NEAR(force(6, 0.0f, 0), 0.5, 2e-3);
 }
 
+/* Gain per kind of effect: texture (periodic) can be boosted without touching the position/speed dependent conditions. */
+TEST(test_fx_gains_per_kind)
+{
+  const uint8_t per[] = { FFB_RID_SET_PERIODIC, 1, 0x88, 0x13, 0, 0, 0, 0, 100, 0 };   /* magnitude 5000 (0.5), 100 ms */
+  fresh();
+  ffb_fx_set_gains(&E, 3.0f, 2.0f, 0.5f, 1.0f);
+  create(FFB_ET_SINE);
+  set_effect(1, FFB_ET_SINE, FFB_TIME_INFINITE, 0, 255, 9000);
+  CHECK(out(per, sizeof(per), 0));
+  op(1, FFB_OP_START, 1, 0);
+  CHECK_NEAR(force(25, 0, 0), 1.0, 1e-6);                 /* 0.5 x 3 = 1.5, limited to the full scale */
+  ffb_fx_set_gains(&E, 1.5f, 2.0f, 0.5f, 1.0f);
+  CHECK_NEAR(force(25, 0, 0), 0.75, 0.01);                /* 0.5 x 1.5 */
+  ffb_fx_set_gains(&E, 3.0f, 2.0f, 0.5f, 0.4f);           /* the periodic part alone is capped at 0.4 */
+  CHECK_NEAR(force(25, 0, 0), 0.4, 1e-6);
+  /* constant: x 2; the cap of the periodic part does not touch it */
+  fresh();
+  ffb_fx_set_gains(&E, 3.0f, 2.0f, 0.5f, 0.1f);
+  create(FFB_ET_CONSTANT);
+  set_effect(1, FFB_ET_CONSTANT, FFB_TIME_INFINITE, 0, 255, 9000);
+  set_constant(1, 2000);
+  op(1, FFB_OP_START, 1, 0);
+  CHECK_NEAR(force(10, 0, 0), 0.4, 2e-3);
+  /* condition: spring x 0.5 */
+  fresh();
+  ffb_fx_set_gains(&E, 3.0f, 2.0f, 0.5f, 1.0f);
+  create(FFB_ET_SPRING);
+  set_effect(1, FFB_ET_SPRING, FFB_TIME_INFINITE, 0, 255, 0);
+  set_cond(1, 0, 10000, 5000, 10000, 3000, 1000);
+  op(1, FFB_OP_START, 1, 0);
+  CHECK_NEAR(force(2, 0.5f, 0), -0.4 * 0.5, 2e-3);
+  /* a Device Reset from the game does not change the tuning; bad values fall back to 1 */
+  ffb_fx_device_control(&E, FFB_DC_RESET);
+  CHECK_NEAR(E.gains.periodic, 3.0, 1e-6);
+  ffb_fx_set_gains(&E, NAN, -1.0f, 1e30f * 1e30f, 7.0f);
+  CHECK_NEAR(E.gains.periodic, 1.0, 1e-6);
+  CHECK_NEAR(E.gains.constant, 1.0, 1e-6);
+  CHECK_NEAR(E.gains.condition, 1.0, 1e-6);
+  CHECK_NEAR(E.gains.periodic_cap, 1.0, 1e-6);
+}
+
 TEST(test_fx_damper_friction_inertia)
 {
   fresh();
@@ -452,7 +494,7 @@ TEST(test_pid_glue_create_handshake)
     ffb_pid_rx_isr(FFB_REPORT_OUTPUT, sc, sizeof(sc));
     ffb_pid_rx_isr(FFB_REPORT_OUTPUT, st, sizeof(st));
     ffb_pid_poll(10, true, NULL);
-    CHECK_NEAR(ffb_pid_force(20, 0, 0, &active), 0.5, 3e-3);
+    CHECK_NEAR(ffb_pid_force(20, 0, 0, &active), (0.5f * FFB_GAIN_CONSTANT > 1.0f) ? 1.0f : 0.5f * FFB_GAIN_CONSTANT, 3e-3);   /* the profile's gain for constant forces */
     CHECK(active);
     CHECK(ffb_pid_actuators_enabled());
     CHECK(ffb_pid_stats()->accepted >= 4);
@@ -471,6 +513,7 @@ void run_ffb_pid_tests(void)
   RUN(test_fx_periodic_waveforms);
   RUN(test_fx_ramp);
   RUN(test_fx_spring_condition);
+  RUN(test_fx_gains_per_kind);
   RUN(test_fx_damper_friction_inertia);
   RUN(test_fx_device_control_and_safety);
   RUN(test_fx_start_solo_and_total_clip);

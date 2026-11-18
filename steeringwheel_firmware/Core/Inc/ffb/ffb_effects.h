@@ -53,9 +53,21 @@ typedef struct
   uint16_t   loops;          /* plays in total; 0xFFFF = infinite          */
 } ffb_fx_t;
 
+/** Gain per kind of game effect, applied before the effects are summed (1 = unchanged). Texture (gravel, rumble strips, engine)
+ *  arrives as weak periodic effects and needs a big gain; forces that depend on the wheel position or speed (spring, damper,
+ *  friction, inertia) form a closed loop with the game and must stay low, or the wheel starts to swing. */
+typedef struct
+{
+  float periodic;        /* sine, square, triangle, saw                          */
+  float constant;        /* constant, ramp (cornering, impacts)                  */
+  float condition;       /* spring, damper, inertia, friction                    */
+  float periodic_cap;    /* the periodic part alone is limited to +-this (normalised, 0..1) */
+} ffb_fx_gains_t;
+
 typedef struct
 {
   ffb_fx_t fx[FFB_MAX_EFFECTS];
+  ffb_fx_gains_t gains;      /* not touched by ffb_fx_reset (a game's Device Reset must not change the tuning) */
   uint8_t  device_gain;      /* 0..255                                     */
   bool     actuators_enabled;
   bool     paused;
@@ -71,6 +83,9 @@ typedef struct
 } ffb_fx_engine_t;
 
 void ffb_fx_init(ffb_fx_engine_t *e);
+
+/** Set the per-kind gains (values that are not finite or negative become 1; the cap is limited to 0..1, 0 or less = 1). */
+void ffb_fx_set_gains(ffb_fx_engine_t *e, float periodic, float constant, float condition, float periodic_cap);
 
 /** PID Device Reset: stop and free everything, defaults back. */
 void ffb_fx_reset(ffb_fx_engine_t *e);

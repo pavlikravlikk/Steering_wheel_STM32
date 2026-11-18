@@ -68,6 +68,10 @@ RANGES = [
     ("ffb", "max_amps", float, 0.0, 6.0),
     ("ffb", "slew_amps_per_s", float, 0.01, 1000.0),
     ("ffb", "host_gain", float, 0.1, 10.0),
+    ("ffb", "gain_periodic", float, 0.0, 10.0),
+    ("ffb", "gain_constant", float, 0.0, 10.0),
+    ("ffb", "gain_condition", float, 0.0, 10.0),
+    ("ffb", "periodic_max_amps", float, 0.0, 6.0),
     ("ffb", "spring_kp_amps_per_turn", float, 0.0, 20.0),
     ("ffb", "damper_amps_per_turn_s", float, 0.0, 20.0),
     ("ffb", "friction_amps", float, 0.0, 1.0),
@@ -251,6 +255,8 @@ def validate(p, require_measured=False):
         errors.append("odrive.watchdog_timeout must be at least 4 command periods")
     if f("vbus_derate_start_v") > 0 and not (f("vbus_min_v") < f("vbus_derate_start_v") < f("vbus_derate_end_v") < f("vbus_max_v")):
         errors.append("need ffb.vbus_min_v < vbus_derate_start_v < vbus_derate_end_v < vbus_max_v (or vbus_derate_start_v = 0 to switch it off)")
+    if f("periodic_max_amps") > f("max_amps"):
+        warnings.append("ffb.periodic_max_amps > ffb.max_amps: the periodic limit has no effect")
     if f("stale_ms") < 3 * f("command_period_ms"):
         errors.append("ffb.stale_ms must be at least 3 command periods")
     if not o("enable_watchdog"):
@@ -346,6 +352,10 @@ def gen_header(p):
     m("FFB_PROFILE_MAX_AMPS", c_float(f("max_amps")))
     m("FFB_SLEW_AMPS_PER_S", c_float(f("slew_amps_per_s")))
     m("FFB_HOST_GAIN", c_float(f("host_gain")), "game force x gain, then clamped (max_amps is still the cap)")
+    m("FFB_GAIN_PERIODIC", c_float(f("gain_periodic")), "game texture (sine/square/triangle/saw) x gain")
+    m("FFB_GAIN_CONSTANT", c_float(f("gain_constant")), "game constant force / ramp x gain")
+    m("FFB_GAIN_CONDITION", c_float(f("gain_condition")), "game spring/damper/friction/inertia x gain (keep low: closed loop)")
+    m("FFB_PERIODIC_MAX_AMPS", c_float(f("periodic_max_amps")), "the periodic part alone is limited to this (A)")
     m("FFB_SPRING_KP", c_float(f("spring_kp_amps_per_turn")), "A per wheel turn")
     m("FFB_DAMPER_KD", c_float(f("damper_amps_per_turn_s")), "A per wheel turn/s")
     m("FFB_FRICTION_AMPS", c_float(f("friction_amps")))

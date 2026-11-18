@@ -62,7 +62,27 @@ static void fx_defaults(ffb_fx_t *f)
 void ffb_fx_init(ffb_fx_engine_t *e)
 {
   memset(e, 0, sizeof(*e));
+  ffb_fx_set_gains(e, 1.0f, 1.0f, 1.0f, 1.0f);
   ffb_fx_reset(e);
+}
+
+void ffb_fx_set_gains(ffb_fx_engine_t *e, float periodic, float constant, float condition, float periodic_cap)
+{
+  e->gains.periodic = (finite_f(periodic) && (periodic >= 0.0f)) ? periodic : 1.0f;
+  e->gains.constant = (finite_f(constant) && (constant >= 0.0f)) ? constant : 1.0f;
+  e->gains.condition = (finite_f(condition) && (condition >= 0.0f)) ? condition : 1.0f;
+  e->gains.periodic_cap = (finite_f(periodic_cap) && (periodic_cap > 0.0f) && (periodic_cap < 1.0f)) ? periodic_cap : 1.0f;
+}
+
+static bool is_periodic(uint8_t t)
+{
+  return (t == FFB_ET_SQUARE) || (t == FFB_ET_SINE) || (t == FFB_ET_TRIANGLE) || (t == FFB_ET_SAW_UP)
+      || (t == FFB_ET_SAW_DOWN);
+}
+
+static bool is_constant(uint8_t t)
+{
+  return (t == FFB_ET_CONSTANT) || (t == FFB_ET_RAMP);
 }
 
 void ffb_fx_reset(ffb_fx_engine_t *e)
@@ -361,7 +381,10 @@ float ffb_fx_eval(ffb_fx_engine_t *e, ffb_fx_t *f, uint32_t now_ms, float pos, f
 
 float ffb_fx_force(ffb_fx_engine_t *e, uint32_t now_ms, float pos, float vel, bool *active)
 {
-  float sum = 0.0f;
+  float psum = 0.0f;                       /* periodic effects (texture)                  */
+  float csum = 0.0f;                       /* constant / ramp                             */
+  float ksum = 0.0f;                       /* conditions: spring, damper, friction, inertia */
+  float sum;
   float accel = 0.0f;
   bool any = false;
 
@@ -384,7 +407,19 @@ float ffb_fx_force(ffb_fx_engine_t *e, uint32_t now_ms, float pos, float vel, bo
     ffb_fx_t *f = &e->fx[i];
     if (f->allocated && f->playing)
     {
-      sum += ffb_fx_eval(e, f, now_ms, pos, vel, accel);
+      const float v = ffb_fx_eval(e, f, now_ms, pos, vel, accel);
+      if (is_periodic(f->type))
+      {
+        psum += v * e->gains.periodic;
+      }
+      else if (is_constant(f->type))
+      {
+        csum += v * e->gains.constant;
+      }
+      else
+      {
+        ksum += v * e->gains.condition;
+      }
       any = any || f->playing;
     }
   }
@@ -393,7 +428,8 @@ float ffb_fx_force(ffb_fx_engine_t *e, uint32_t now_ms, float pos, float vel, bo
     *active = false;
     return 0.0f;
   }
-  sum *= (float)e->device_gain / 255.0f;
+  psum = clampf(psum, -e->gains.periodic_cap, e->gains.periodic_cap);
+  sum = (psum + csum + ksum) * ((float)e->device_gain / 255.0f);
   if ((sum > 1.0f) || (sum < -1.0f))
   {
     e->clipped++;                          /* total force limited to full scale */

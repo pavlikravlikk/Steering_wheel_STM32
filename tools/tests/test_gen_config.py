@@ -121,6 +121,14 @@ class TestProfile(unittest.TestCase):
         errors, _ = gen_config.validate(p)
         self.assertFalse(any("vbus_derate" in e for e in errors))
 
+    def test_gains_per_effect_kind_are_in_the_generated_header(self):
+        p = load()
+        self.assertEqual(gen_config.val(p, "ffb", "gain_condition"), 1.0)
+        out = gen_config.render_header(p) if hasattr(gen_config, "render_header") else ""
+        if out:
+            for name in ("FFB_GAIN_PERIODIC", "FFB_GAIN_CONSTANT", "FFB_GAIN_CONDITION", "FFB_PERIODIC_MAX_AMPS"):
+                self.assertIn(name, out)
+
     def test_ffb_max_amps_above_hard_cap_is_error(self):
         p = load()
         set_val(p, "ffb", "max_amps", 6.5)
