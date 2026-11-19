@@ -1,0 +1,17 @@
+# udev rule: let the logged-in user access the steering wheel without sudo.
+# STM32F3Discovery USB USER port, VID 0x0483 / PID 0x5752.
+#
+# Install (once, needs root):
+#   sudo cp tools/99-steeringwheel.rules /etc/udev/rules.d/
+#   sudo udevadm control --reload-rules && sudo udevadm trigger
+#   then unplug and replug the USB USER cable.
+# Check:  ls -l /dev/hidraw*   (the wheel's node should be group-accessible / have an ACL)
+#         getfacl /dev/hidrawN
+#
+# hidraw: raw reports for tools/hid_probe.py and stm_32_wheel.py
+# GROUP="plugdev" added 2026-11-16: on the owner's machine the "uaccess" ACL was not applied on a
+# plain replug (Permission denied on /dev/hidraw0), so members of plugdev get access as well.
+KERNEL=="hidraw*", ATTRS{idVendor}=="0483", ATTRS{idProduct}=="5752", GROUP="plugdev", MODE="0660", TAG+="uaccess"
+# evdev: joystick + force feedback (evtest, fftest and games need write access
+# to the event node to upload effects in FFB builds)
+SUBSYSTEM=="input", ATTRS{idVendor}=="0483", ATTRS{idProduct}=="5752", GROUP="plugdev", MODE="0660", TAG+="uaccess"

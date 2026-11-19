@@ -74,12 +74,12 @@
 /*---------- -----------*/
 #define USBD_CUSTOMHID_OUTREPORT_BUF_SIZE     2U
 /*---------- -----------*/
-#define USBD_CUSTOM_HID_REPORT_DESC_SIZE     20U
+#define USBD_CUSTOM_HID_REPORT_DESC_SIZE     42U
 /*---------- -----------*/
 #define CUSTOM_HID_EPIN_SIZE                 0x40U
 #define CUSTOM_HID_EPOUT_SIZE                0x40U
 /*---------- -----------*/
-#define CUSTOM_HID_FS_BINTERVAL     0x5U
+#define CUSTOM_HID_FS_BINTERVAL     0x1U
 
 /****************************************/
 /* #define for FS and HS identification */

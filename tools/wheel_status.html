@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wheel status</title>
+<style>
+  :root { color-scheme: light dark; --ok:#1a7f37; --warn:#9a6700; --bad:#cf222e; }
+  body { font-family: system-ui, sans-serif; margin: 16px; max-width: 760px; }
+  button { font-size: 16px; padding: 8px 14px; margin-right: 8px; }
+  #state { font-size: 34px; font-weight: 700; margin: 12px 0 4px; }
+  .ok { color: var(--ok); } .warn { color: var(--warn); } .bad { color: var(--bad); }
+  table { border-collapse: collapse; margin: 8px 0; }
+  td { padding: 2px 14px 2px 0; }
+  .bar { width: 320px; height: 14px; border: 1px solid #888; position: relative; }
+  .bar > i { position: absolute; top: 0; bottom: 0; background: #3b82f6; }
+  .bar > b { position: absolute; top: -2px; bottom: -2px; left: 50%; width: 1px; background: #888; }
+  pre { background: rgba(127,127,127,.15); padding: 8px; max-height: 260px; overflow: auto; font-size: 13px; }
+</style>
+</head>
+<body>
+<h1>Steering wheel: FFB status</h1>
+<p>Read-only monitor (Chrome or Edge, WebHID). It never sends anything to the wheel except the request for the status report.
+Press <b>Connect</b> and choose <b>Steering Wheel Controller</b>. Close other programs that hold the wheel only if the connection fails.</p>
+<button id="connect">Connect</button><button id="copy">Copy log</button><span id="msg"></span>
+<div id="state">not connected</div>
+<table>
+  <tr><td>pre-arm reason</td><td id="reason">-</td></tr>
+  <tr><td>fault</td><td id="fault">-</td></tr>
+  <tr><td>torque command</td><td><span id="torque">-</span> A &nbsp; (peak <span id="peak">0.000</span> A)</td></tr>
+  <tr><td></td><td><div class="bar"><b></b><i id="tbar"></i></div></td></tr>
+  <tr><td>game effects playing</td><td id="host">-</td></tr>
+  <tr><td>flags</td><td id="flags">-</td></tr>
+  <tr><td>command rate</td><td id="rate">-</td></tr>
+  <tr><td>ODrive reply timeouts</td><td id="timeouts">-</td></tr>
+  <tr><td>supply</td><td id="vbus">-</td></tr>
+  <tr><td>steering X</td><td id="x">-</td></tr>
+</table>
+<pre id="log">log (a line is added when something changes)</pre>
+<script>
+// BEGIN DECODE (mirrors tools/hid_probe.py; checked by tools/tests/test_wheel_status_html.py)
+const STATES = {0: "DISARMED", 1: "PRECHECK", 2: "ARMING", 3: "RUNNING", 4: "FAULT"};
+const REASONS = {
+  0: "OK", 1: "ARM_NOT_ALLOWED", 2: "PROFILE_TBD", 3: "SIMULATION_BUILD", 4: "POSITION_STALE",
+  5: "READ_TIMEOUT", 6: "WATCHDOG_DISABLED", 7: "WATCHDOG_TIMEOUT_RANGE", 8: "CONTROL_MODE",
+  9: "CURRENT_LIM_HIGH", 10: "VEL_LIMIT_HIGH", 11: "MOTOR_NOT_CALIBRATED", 12: "ENCODER_NOT_READY",
+  13: "AXIS_ERROR", 14: "MOTOR_ERROR", 15: "ENCODER_ERROR", 16: "VBUS_RANGE",
+  17: "TORQUE_CONSTANT_RANGE", 18: "NOT_CHECKED_YET", 19: "READ_ERROR", 20: "NOT_IDLE", 21: "WHEEL_OUT_OF_RANGE"
+};
+const FAULTS = {
+  0: "NONE", 1: "POSITION_STALE", 2: "ODRIVE_ERROR", 3: "UART_TIMEOUT", 4: "VBUS_RANGE",
+  5: "WATCHDOG_FEED_FAILED", 6: "TORQUE_INVALID", 7: "OVERSPEED", 8: "ARMING_TIMEOUT",
+  9: "LOOP_OVERRUN", 10: "READ_FAILED", 11: "INTERNAL"
+};
+const FLAGS = {0: "arm_allowed_build", 1: "precheck_ok", 2: "profile_measured", 3: "host_effects_playing",
+               4: "actuators_enabled", 5: "arm_gesture_active", 6: "vbus_derating"};
+
+// bytes: DataView or Uint8Array of the feature report 0x40, with or without the leading report ID byte (16 or 15 bytes)
+function decodeStatus(bytes) {
+  const u8 = bytes instanceof DataView
+    ? new Uint8Array(bytes.buffer, bytes.byteOffset, bytes.byteLength) : Uint8Array.from(bytes);
+  const b = (u8.length === 16 && u8[0] === 0x40) ? u8.slice(1) : u8;
+  if (b.length < 15) throw new Error("status report too short: " + b.length);
+  const dv = new DataView(b.buffer, b.byteOffset, b.byteLength);
+  const flags = dv.getUint8(4);
+  return {
+    version: dv.getUint8(0),
+    state: STATES[dv.getUint8(1)] || ("?" + dv.getUint8(1)),
+    reason: REASONS[dv.getUint8(2)] || ("?" + dv.getUint8(2)),
+    fault: FAULTS[dv.getUint8(3)] || ("?" + dv.getUint8(3)),
+    flags: Object.keys(FLAGS).filter(k => flags & (1 << k)).map(k => FLAGS[k]),
+    torqueA: dv.getInt16(5, true) / 1000,
+    rateHz: dv.getUint16(7, true),
+    loopUsMax: dv.getUint16(9, true),
+    timeouts: dv.getUint16(11, true),
+    vbusV: dv.getUint16(13, true) / 10
+  };
+}
+// END DECODE
+
+let device = null, last = "", lastTorque = 0, peak = 0, started = performance.now();
+const $ = id => document.getElementById(id);
+const logLines = [];
+function log(line) {
+  const t = ((performance.now() - started) / 1000).toFixed(1).padStart(6);
+  logLines.push(t + " s  " + line);
+  if (logLines.length > 400) logLines.shift();
+  $("log").textContent = logLines.slice(-60).join("\n");
+  $("log").scrollTop = $("log").scrollHeight;
+}
+function render(s) {
+  const cls = s.state === "FAULT" ? "bad" : (s.state === "RUNNING" ? "ok" : "warn");
+  $("state").textContent = s.state; $("state").className = cls;
+  $("reason").textContent = s.reason; $("fault").textContent = s.fault;
+  $("fault").className = s.fault === "NONE" ? "" : "bad";
+  $("torque").textContent = (s.torqueA >= 0 ? "+" : "") + s.torqueA.toFixed(3);
+  peak = Math.max(peak, Math.abs(s.torqueA)); $("peak").textContent = peak.toFixed(3);
+  const f = Math.max(-1, Math.min(1, s.torqueA / 1.0));
+  const bar = $("tbar"); bar.style.left = (f >= 0 ? 50 : 50 + f * 50) + "%"; bar.style.width = Math.abs(f) * 50 + "%";
+  const host = s.flags.includes("host_effects_playing");
+  $("host").textContent = host ? "YES: the computer is playing a force effect" : "no";
+  $("host").className = host ? "ok" : "";
+  $("flags").textContent = s.flags.join(", ") || "-";
+  $("rate").textContent = s.rateHz + " Hz (worst loop " + s.loopUsMax + " us)";
+  $("timeouts").textContent = s.timeouts; $("vbus").textContent = s.vbusV.toFixed(1) + " V";
+  const key = [s.state, s.reason, s.fault, s.flags.join("+")].join("|");
+  if (key !== last || Math.abs(s.torqueA - lastTorque) > 0.05) {
+    log(s.state + " reason=" + s.reason + " fault=" + s.fault + " torque=" + s.torqueA.toFixed(3) +
+        " flags=" + (s.flags.join(",") || "-"));
+    last = key; lastTorque = s.torqueA;
+  }
+}
+async function poll() {
+  if (!device) return;
+  try { render(decodeStatus(await device.receiveFeatureReport(0x40))); $("msg").textContent = ""; }
+  catch (e) { $("msg").textContent = "read failed: " + e.message; }
+}
+$("connect").onclick = async () => {
+  if (!("hid" in navigator)) { $("msg").textContent = "WebHID is not available: use Chrome or Edge"; return; }
+  try {
+    const list = await navigator.hid.requestDevice({ filters: [{ vendorId: 0x0483, productId: 0x5752 }] });
+    if (!list.length) { $("msg").textContent = "no device chosen"; return; }
+    device = list[0];
+    if (!device.opened) await device.open();
+    device.addEventListener("inputreport", e => {
+      if (e.reportId === 1 && e.data.byteLength >= 2) {
+        const x = e.data.getUint16(0, true);
+        $("x").textContent = x + "  (" + ((x - 32768) / 327.68).toFixed(1) + " %)";
+      }
+    });
+    started = performance.now(); log("connected to " + device.productName);
+    setInterval(poll, 250);
+  } catch (e) { $("msg").textContent = "connect failed: " + e.message; }
+};
+$("copy").onclick = async () => {
+  try { await navigator.clipboard.writeText(logLines.join("\n")); $("msg").textContent = "log copied"; }
+  catch (e) { $("msg").textContent = "copy failed: select the log text by hand"; }
+};
+</script>
+</body>
+</html>
